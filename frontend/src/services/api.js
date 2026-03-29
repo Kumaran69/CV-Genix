@@ -3,162 +3,170 @@ import axios from "axios";
 /* ── Base API instance ───────────────────────────────────────────────────── */
 const API = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  timeout: 10000, // Add timeout to prevent hanging requests
+  headers: { "Content-Type": "application/json" },
+  timeout: 10000,
 });
 
-/* ── Attach token — checks both localStorage and sessionStorage ──────────── */
+/* ── Attach token from storage (auto on every request) ───────────────────── */
+// Token is read from storage on every request so it's always fresh.
+// Dashboard/ResumeBuilder pass token as a param too — that's fine,
+// but the interceptor handles it automatically so no manual header needed.
 API.interceptors.request.use((req) => {
   const token =
     localStorage.getItem("token") ||
     sessionStorage.getItem("token");
-  if (token) {
-    req.headers.Authorization = `Bearer ${token}`;
-  }
-  
-  // Log requests in development (optional)
+  if (token) req.headers.Authorization = `Bearer ${token}`;
+
   if (import.meta.env.DEV) {
     console.log(`🚀 ${req.method.toUpperCase()} ${req.baseURL}${req.url}`, req.data);
   }
-  
   return req;
 });
 
-/* ── Response interceptor — surface auth errors clearly ─────────────────── */
+/* ── Response interceptor ────────────────────────────────────────────────── */
 API.interceptors.response.use(
   (res) => {
-    // Log responses in development (optional)
-    if (import.meta.env.DEV) {
-      console.log(`✅ ${res.status} ${res.config.url}`, res.data);
-    }
+    if (import.meta.env.DEV) console.log(`✅ ${res.status} ${res.config.url}`, res.data);
     return res;
   },
   (err) => {
-    // Handle 401 Unauthorized
-    if (err.response?.status === 401) {
-      console.error("❌ Unauthorized — token missing or expired.");
-      // Optionally clear token and redirect to login
-      // localStorage.removeItem("token");
-      // sessionStorage.removeItem("token");
-      // window.location.href = "/login";
-    }
-    
-    // Handle 404 Not Found
-    if (err.response?.status === 404) {
-      console.error(`❌ Endpoint not found: ${err.config?.method?.toUpperCase()} ${err.config?.url}`);
-    }
-    
-    // Handle 400 Bad Request - log the actual error message from server
-    if (err.response?.status === 400) {
-      console.error("❌ Bad Request:", err.response.data);
-    }
-    
-    // Log error details in development
+    if (err.response?.status === 401) console.error("❌ Unauthorized — token missing or expired.");
+    if (err.response?.status === 404) console.error(`❌ Not found: ${err.config?.method?.toUpperCase()} ${err.config?.url}`);
+    if (err.response?.status === 400) console.error("❌ Bad Request:", err.response.data);
     if (import.meta.env.DEV) {
       console.error("API Error:", {
-        status: err.response?.status,
+        status:     err.response?.status,
         statusText: err.response?.statusText,
-        data: err.response?.data,
-        url: err.config?.url,
-        method: err.config?.method
+        data:       err.response?.data,
+        url:        err.config?.url,
+        method:     err.config?.method,
       });
     }
-    
     return Promise.reject(err);
   }
 );
 
-/* ── Helper function to clean resume data before sending ─────────────────── */
+/* ── Enum maps — must match MongoDB schema exactly ───────────────────────── */
+
+// Schema: ["Beginner","Intermediate","Advanced","Expert"]
+const LEVEL_MAP = {
+  beginner:     "Beginner",
+  intermediate: "Intermediate",
+  advanced:     "Advanced",
+  expert:       "Expert",
+  competent:    "Intermediate",
+  proficient:   "Intermediate",
+  skilled:      "Intermediate",
+  experienced:  "Expert",
+  master:       "Expert",
+};
+
+// Schema: ["Programming","Framework","Database","Tool","Language","Soft Skill","Other"]
+const CATEGORY_MAP = {
+  programming:  "Programming",
+  technical:    "Programming",
+  framework:    "Framework",
+  database:     "Database",
+  tool:         "Tool",
+  tools:        "Tool",
+  language:     "Language",
+  "soft skill": "Soft Skill",
+  softskill:    "Soft Skill",
+  soft:         "Soft Skill",
+  hard:         "Programming",
+  other:        "Other",
+};
+
+// Schema: ["Basic","Conversational","Professional","Native"]
+const PROFICIENCY_MAP = {
+  basic:           "Basic",
+  beginner:        "Basic",
+  elementary:      "Basic",
+  conversational:  "Conversational",
+  intermediate:    "Conversational",  // ✅ fixes `intermediate` not valid
+  moderate:        "Conversational",
+  professional:    "Professional",
+  advanced:        "Professional",
+  fluent:          "Professional",
+  proficient:      "Professional",
+  skilled:         "Professional",
+  native:          "Native",
+  "mother tongue": "Native",
+};
+
+/* ── Clean + normalize resume data before sending to API ─────────────────── */
 const cleanResumeData = (data) => {
   if (!data) return data;
-  
-  // Create a deep copy to avoid mutating original
+  if (data.test === true) return data; // skip test/health-check calls
+
   const cleaned = JSON.parse(JSON.stringify(data));
-  
-  // Clean skills array
-  if (cleaned.skills && Array.isArray(cleaned.skills)) {
+
+  // ── Skills ──────────────────────────────────────────────────────────
+  if (Array.isArray(cleaned.skills) && cleaned.skills.length > 0) {
     cleaned.skills = cleaned.skills
-      .map(skill => {
+      .map((skill) => {
         if (typeof skill === "string") {
+          return { name: skill.trim(), level: "Intermediate", category: "Programming" };
+        }
+        if (skill && typeof skill === "object") {
           return {
-            name: skill,
-            level: "beginner",
-            category: "technical"
+            name:     (skill.name || "").trim(),
+            level:    LEVEL_MAP[skill.level?.toLowerCase().trim()]       || "Intermediate",
+            category: CATEGORY_MAP[skill.category?.toLowerCase().trim()] || "Programming",
           };
         }
-        
-        // Validate level
-        let level = "beginner";
-        if (skill.level) {
-          const levelLower = skill.level.toLowerCase();
-          if (["beginner", "intermediate", "advanced", "expert"].includes(levelLower)) {
-            level = levelLower;
-          } else if (["competent", "proficient", "skilled"].includes(levelLower)) {
-            level = "intermediate";
-          } else if (["experienced", "master"].includes(levelLower)) {
-            level = "expert";
-          }
-        }
-        
-        // Validate category
-        let category = "technical";
-        if (skill.category) {
-          const catLower = skill.category.toLowerCase();
-          if (["technical", "soft", "tools"].includes(catLower)) {
-            category = catLower;
-          } else if (catLower.includes("hard")) {
-            category = "technical";
-          } else if (catLower.includes("soft")) {
-            category = "soft";
-          } else if (["tool", "tools", "framework"].includes(catLower)) {
-            category = "tools";
-          }
-        }
-        
-        return {
-          name: skill.name || "",
-          level,
-          category
-        };
+        return null;
       })
-      .filter(s => s.name && s.name.trim() !== "");
+      .filter((s) => s && s.name && s.name.trim() !== "");
   }
-  
-  // Clean languages array
-  if (cleaned.languages && Array.isArray(cleaned.languages)) {
+
+  // ── Languages ────────────────────────────────────────────────────────
+  if (Array.isArray(cleaned.languages) && cleaned.languages.length > 0) {
     cleaned.languages = cleaned.languages
-      .map(lang => {
-        const name = lang.language || lang.name || "";
-        
-        let proficiency = "intermediate";
-        if (lang.proficiency) {
-          const profLower = lang.proficiency.toLowerCase();
-          if (["native", "fluent", "intermediate", "basic"].includes(profLower)) {
-            proficiency = profLower;
-          } else if (["professional", "advanced"].includes(profLower)) {
-            proficiency = "fluent";
-          } else if (profLower === "conversational") {
-            proficiency = "intermediate";
-          }
-        }
-        
+      .map((lang) => {
+        if (!lang) return null;
+        const name    = (lang.language || lang.name || "").trim();
+        if (!name) return null;
+        const profKey = (lang.proficiency || lang.level || "").toLowerCase().trim();
         return {
           name,
-          proficiency
+          proficiency: PROFICIENCY_MAP[profKey] || "Professional",
         };
       })
-      .filter(l => l.name && l.name.trim() !== "");
+      .filter((l) => l && l.name);
   }
-  
-  // Remove undefined/null values
-  Object.keys(cleaned).forEach(key => {
-    if (cleaned[key] === undefined || cleaned[key] === null) {
-      delete cleaned[key];
-    }
+
+  // ── Experience — ensure achievements is always an array ─────────────
+  if (Array.isArray(cleaned.experience)) {
+    cleaned.experience = cleaned.experience.map((exp) => ({
+      ...exp,
+      achievements: Array.isArray(exp.achievements)
+        ? exp.achievements
+        : exp.achievements
+        ? [exp.achievements]
+        : [],
+    }));
+  }
+
+  // ── Education — ensure achievements is always an array ──────────────
+  if (Array.isArray(cleaned.education)) {
+    cleaned.education = cleaned.education.map((edu) => ({
+      ...edu,
+      achievements: Array.isArray(edu.achievements) ? edu.achievements : [],
+    }));
+  }
+
+  // ── Remove null/undefined top-level keys ─────────────────────────────
+  Object.keys(cleaned).forEach((key) => {
+    if (cleaned[key] === undefined || cleaned[key] === null) delete cleaned[key];
   });
-  
+
+  // ── Remove empty arrays so backend doesn't overwrite with [] ─────────
+  ["skills", "languages", "experience", "education",
+   "projects", "certifications", "hobbies", "references"].forEach((key) => {
+    if (Array.isArray(cleaned[key]) && cleaned[key].length === 0) delete cleaned[key];
+  });
+
   return cleaned;
 };
 
@@ -167,72 +175,64 @@ export const signup = (data) => API.post("/auth/signup", data);
 export const login  = (data) => API.post("/auth/login",  data);
 
 /* ── Resume APIs ─────────────────────────────────────────────────────────── */
-// Create a new resume
-export const createResume = (data) => {
-  const cleanedData = cleanResumeData(data);
-  return API.post("/resumes", cleanedData);
-};
 
-// Get all resumes
-export const getResumes = () => API.get("/resumes");
+// ✅ getResumes — Dashboard calls getResumes(token) but token is ignored
+//    because the interceptor handles auth automatically. Safe either way.
+export const getResumes = (_token) => API.get("/resumes");
 
-// Get resume by ID
+// ✅ getResumeById — called as getResumeById(id) from ResumeBuilder/Preview
 export const getResumeById = (id) => API.get(`/resumes/${id}`);
 
-// Save resume (using the correct endpoint based on your backend)
-// FIXED: Now tries both endpoints with fallback
+// ✅ createResume — called as createResume(data)
+export const createResume = (data) => API.post("/resumes", cleanResumeData(data));
+
+// ✅ updateResume — called as updateResume(id, data)
+export const updateResume = (id, data) => API.put(`/resumes/${id}`, cleanResumeData(data));
+
+// ✅ deleteResume — Dashboard calls deleteResume(id, token)
+//    second arg (token) is unused; interceptor handles auth
+export const deleteResume = (id, _token) => API.delete(`/resumes/${id}`);
+
+// ✅ saveResume — called as API.post("/resumes/save", data) from ResumeBuilder
+//    also exported for direct use with fallback
 export const saveResume = async (data) => {
   const cleanedData = cleanResumeData(data);
-  
   try {
-    // First try POST /resumes (RESTful)
+    // Try POST /resumes first (RESTful create)
     return await API.post("/resumes", cleanedData);
   } catch (err) {
-    // If 404, try POST /resumes/save (custom endpoint)
-    if (err.response?.status === 404) {
+    // Fallback to /resumes/save (upsert endpoint)
+    if (err.response?.status === 404 || err.response?.status === 409) {
       console.log("Falling back to /resumes/save endpoint");
       return await API.post("/resumes/save", cleanedData);
     }
-    // If other error, rethrow
     throw err;
   }
 };
 
-// Update existing resume
-export const updateResume = (id, data) => {
-  const cleanedData = cleanResumeData(data);
-  return API.put(`/resumes/${id}`, cleanedData);
-};
-
-// Delete resume
-export const deleteResume = (id) => API.delete(`/resumes/${id}`);
-
-// Helper function to check which endpoints work
+// ✅ Helper — debug which endpoints respond
 export const checkResumeEndpoints = async () => {
   const endpoints = [
-    { method: 'POST', url: '/resumes', name: 'POST /resumes' },
-    { method: 'POST', url: '/resumes/save', name: 'POST /resumes/save' },
+    { method: "POST", url: "/resumes",      name: "POST /resumes" },
+    { method: "POST", url: "/resumes/save", name: "POST /resumes/save" },
   ];
-  
   const results = {};
-  
-  for (const endpoint of endpoints) {
+  for (const ep of endpoints) {
     try {
       await API({
-        method: endpoint.method,
-        url: endpoint.url,
-        data: { test: true },
-        validateStatus: (status) => status < 500 // Don't throw on 4xx
+        method: ep.method,
+        url:    ep.url,
+        data:   { test: true },
+        validateStatus: (s) => s < 500,
       });
-      results[endpoint.name] = '✅ Available';
+      results[ep.name] = "✅ Available";
     } catch (err) {
-      results[endpoint.name] = `❌ Error: ${err.response?.status || err.message}`;
+      results[ep.name] = `❌ Error: ${err.response?.status || err.message}`;
     }
   }
-  
   console.table(results);
   return results;
 };
 
-/* ── Export instance for jobService etc. ─────────────────────────────────── */
+/* ── Export axios instance for direct use (ResumeBuilder uses API.post) ─── */
 export { API };

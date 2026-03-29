@@ -4,6 +4,7 @@ import ResumeForm from "../components/ResumeForm.jsx";
 import ResumePreview from "../components/ResumePreview.jsx";
 import { createResume, updateResume, getResumeById, API } from "../services/api.js";
 import { AuthContext } from "../context/AuthContext.jsx";
+// Note: token is handled automatically by the API interceptor in api.js
 import {
   Save,
   Download,
@@ -36,15 +37,15 @@ const DEFAULT_RESUME = {
 };
 
 // ─────────────────────────────────────────────
-// ✅ FIXED: SECTIONS was commented out but used everywhere — restored
+// Sections — used for completion + jump logic
 // ─────────────────────────────────────────────
-const SECTIONS = [
-  { key: "personal",       label: "Personal",       icon: "👤" },
-  { key: "experience",     label: "Experience",     icon: "💼" },
-  { key: "education",      label: "Education",      icon: "🎓" },
-  { key: "skills",         label: "Skills",         icon: "⚡" },
-  { key: "projects",       label: "Projects",       icon: "🚀" },
-];
+// const SECTIONS = [
+//   { key: "personal",   label: "Personal",   icon: "👤" },
+//   { key: "experience", label: "Experience", icon: "💼" },
+//   { key: "education",  label: "Education",  icon: "🎓" },
+//   { key: "skills",     label: "Skills",     icon: "⚡" },
+//   { key: "projects",   label: "Projects",   icon: "🚀" },
+// ];
 
 // ─────────────────────────────────────────────
 // Completion calculator
@@ -142,11 +143,7 @@ function formatDataForSave(data) {
 
   const skills = (data.skills || []).map((sk) => {
     if (typeof sk === "string") return { name: sk, level: "Intermediate", category: "Other" };
-    return {
-      name:     sk.name     || sk,
-      level:    sk.level    || "Intermediate",
-      category: sk.category || "Other",
-    };
+    return { name: sk.name || sk, level: sk.level || "Intermediate", category: sk.category || "Other" };
   }).filter((sk) => sk.name);
 
   const experience = (data.experience || [])
@@ -293,17 +290,21 @@ export default function ResumeBuilder() {
 
   // ── Fetch existing resume by ID from URL ──────────────────────────────
   useEffect(() => {
+    // Priority 1: URL param ID  → fetch from API
+    // Priority 2: location.state?.resume → passed directly (legacy support)
+    // Priority 3: new resume
+
     if (id) {
       const load = async () => {
         try {
           setIsFetching(true);
-          const res  = await getResumeById(id);
+          const res  = await getResumeById(id);          // token auto-attached by interceptor
           const raw  = res.data?.resume || res.data;
           const data = mergeResume(raw);
           setResumeData(data);
           setResumeId(id);
 
-          // Jump to first incomplete section automatically
+          // ✅ Jump to first INCOMPLETE section automatically
           const firstIncomplete = findFirstIncompleteSection(data);
           setActiveSection(SECTIONS[firstIncomplete].key);
         } catch (err) {
@@ -315,13 +316,14 @@ export default function ResumeBuilder() {
       };
       load();
     } else if (location.state?.resume) {
+      // Legacy: state was passed via navigate
       const data = mergeResume(location.state.resume);
       setResumeData(data);
       setResumeId(location.state.resume._id || location.state.resume.id || null);
       const firstIncomplete = findFirstIncompleteSection(data);
       setActiveSection(SECTIONS[firstIncomplete].key);
     }
-  }, [id]);
+  }, [id, token]);
 
   // ── Undo-aware updater ─────────────────────────────────────────────────
   const updateResumeData = useCallback((updater) => {
@@ -357,20 +359,21 @@ export default function ResumeBuilder() {
       const formatted = formatDataForSave(resumeData);
 
       if (resumeId) {
-        // Editing existing resume — PUT /resumes/:id
+        // ✅ Editing existing resume — PUT /resumes/:id
         const res = await updateResume(resumeId, formatted);
+        // getFormattedData() returns 'id', not '_id' — handle both
         const updatedId = res.data?.resume?.id || res.data?.resume?._id || resumeId;
         setResumeId(updatedId);
       } else {
-        // New resume — use createResume instead of API.post directly
+        // ✅ New resume — use /resumes/save (upsert by title) to avoid
+        //    duplicate-title 400 errors on double-click or retry
+        // Make title unique by appending timestamp if name is generic
         if (!formatted.title || formatted.title === "My Resume") {
-          formatted.title = `Resume - ${new Date().toLocaleDateString("en-GB", {
-            day: "2-digit", month: "short", year: "numeric",
-          })}`;
+          formatted.title = `Resume - ${new Date().toLocaleDateString("en-GB", { day:"2-digit", month:"short", year:"numeric" })}`;
         }
-        // ✅ FIXED: Use createResume instead of API.post
-        const res = await createResume(formatted);
-        const newId = res.data?.resume?.id || res.data?.resume?._id || res.data?._id;
+        const res = await API.post("/resumes/save", formatted);
+        // getFormattedData() returns 'id' not '_id'
+        const newId = res.data?.resume?.id || res.data?.resume?._id;
         if (newId) setResumeId(newId);
       }
 
@@ -379,6 +382,7 @@ export default function ResumeBuilder() {
       setTimeout(() => setShowSaveSuccess(false), 4000);
       setTimeout(() => navigate("/dashboard"), 1600);
     } catch (err) {
+      // Surface the backend's specific validation errors if present
       const backendErrors = err.response?.data?.errors;
       const msg = backendErrors
         ? backendErrors.join(", ")
@@ -389,7 +393,7 @@ export default function ResumeBuilder() {
     }
   };
 
-  const goToTemplates = () => navigate("/template-selection", { state: { resumeData } });
+  const goToTemplates = () => navigate("/pages/TemplateSelection", { state: { resumeData } });
 
   // ── Loading state while fetching ──────────────────────────────────────
   if (isFetching) {
@@ -481,16 +485,14 @@ export default function ResumeBuilder() {
               <button onClick={() => setPreviewMode((v) => !v)}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:bg-blue-500/10 active:scale-95"
                 style={{ border:"1px solid var(--border)",color:"#93c5fd" }}>
-                {previewMode
-                  ? <><EyeOff className="w-4 h-4 text-indigo-400" /> Hide Preview</>
-                  : <><Eye    className="w-4 h-4 text-indigo-400" /> Show Preview</>}
+                {previewMode ? <><EyeOff className="w-4 h-4 text-indigo-400" /> Hide Preview</>
+                             : <><Eye className="w-4 h-4 text-indigo-400" /> Show Preview</>}
               </button>
               <button onClick={handleSave} disabled={isSaving}
                 className="pulse-ring flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                 style={{ background:isSaving?"rgba(52,211,153,0.25)":"linear-gradient(135deg,#059669,#10b981)",boxShadow:"0 0 20px rgba(52,211,153,0.22)",color:"#fff" }}>
-                {isSaving
-                  ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving…</>
-                  : <><Save className="w-4 h-4" />{isEditing ? "Update" : "Save"}</>}
+                {isSaving ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving…</>
+                          : <><Save className="w-4 h-4" />{isEditing ? "Update" : "Save"}</>}
               </button>
             </div>
           </div>
@@ -509,7 +511,7 @@ export default function ResumeBuilder() {
                 style={{ width:`${completion}%`, background:completion>=80?"linear-gradient(90deg,#059669,#34d399)":completion>=40?"linear-gradient(90deg,#1d4ed8,#60a5fa)":"linear-gradient(90deg,#3730a3,#818cf8)" }} />
             </div>
 
-            {/* Clickable section pills */}
+            {/* ✅ Clickable section pills — click to jump to that section */}
             <div className="flex flex-wrap gap-2 mt-3">
               {SECTIONS.map((s) => (
                 <SectionPill
@@ -523,7 +525,7 @@ export default function ResumeBuilder() {
               ))}
             </div>
 
-            {/* "Continue from" hint when editing */}
+            {/* ✅ "Continue from" hint when editing */}
             {isEditing && (
               <p className="text-xs mt-2" style={{ color:"#4a6080" }}>
                 {isSectionFilled("personal", resumeData) &&
@@ -581,8 +583,8 @@ export default function ResumeBuilder() {
                     <ResumeForm
                       resumeData={resumeData}
                       setResumeData={updateResumeData}
-                      activeSection={activeSection}
-                      onSectionChange={setActiveSection}
+                      activeSection={activeSection}       // ✅ pass active section so form can scroll/focus
+                      onSectionChange={setActiveSection}  // ✅ form can update active section as user scrolls
                     />
                   </div>
                 </div>
@@ -622,9 +624,8 @@ export default function ResumeBuilder() {
                     <button onClick={handleSave} disabled={isSaving}
                       className="pulse-ring flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all duration-200 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                       style={{ background:isSaving?"rgba(52,211,153,0.25)":"linear-gradient(135deg,#059669,#10b981)",boxShadow:"0 4px 20px rgba(52,211,153,0.25)",color:"#fff" }}>
-                      {isSaving
-                        ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving…</>
-                        : <><Save className="w-4 h-4" />{isEditing ? "Update Resume" : "Save Resume"}</>}
+                      {isSaving ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Saving…</>
+                                : <><Save className="w-4 h-4" />{isEditing ? "Update Resume" : "Save Resume"}</>}
                     </button>
                     <button className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all duration-200 hover:brightness-110 active:scale-95"
                       style={{ background:"linear-gradient(135deg,#1d4ed8,#3b82f6)",boxShadow:"0 4px 20px rgba(59,130,246,0.28)",color:"#fff" }}>
@@ -660,9 +661,7 @@ export default function ResumeBuilder() {
                 <button onClick={handleSave} disabled={isSaving}
                   className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold disabled:opacity-60"
                   style={{ background:"linear-gradient(135deg,#059669,#10b981)",color:"#fff" }}>
-                  {isSaving
-                    ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    : <Save className="w-4 h-4" />}
+                  {isSaving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
                   {isSaving ? "Saving…" : isEditing ? "Update" : "Save"}
                 </button>
                 <button className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold"
