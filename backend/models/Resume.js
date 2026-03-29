@@ -200,6 +200,8 @@ const resumeSchema = new mongoose.Schema({
       required: [true, "Skill name is required"],
       trim: true
     },
+    // ✅ FIXED: normalize to Title Case before save via pre-save hook
+    // Accepts any casing from frontend — beginner/Beginner/BEGINNER all work
     level: {
       type: String,
       enum: ["Beginner", "Intermediate", "Advanced", "Expert"],
@@ -278,43 +280,98 @@ const resumeSchema = new mongoose.Schema({
     default: Date.now
   }
 }, {
-  timestamps: true // This automatically adds createdAt and updatedAt
+  timestamps: true
 });
 
-// Update the updatedAt timestamp on save
-resumeSchema.pre("save", function(next) {
+// ─── Normalization maps ────────────────────────────────────────────────────
+const LEVEL_MAP = {
+  beginner:     "Beginner",
+  intermediate: "Intermediate",
+  advanced:     "Advanced",
+  expert:       "Expert",
+};
+
+const CATEGORY_MAP = {
+  programming: "Programming",
+  framework:   "Framework",
+  database:    "Database",
+  tool:        "Tool",
+  tools:       "Tool",        // ✅ "tools" → "Tool"
+  language:    "Language",
+  "soft skill":"Soft Skill",
+  softskill:   "Soft Skill",
+  other:       "Other",
+  technical:   "Programming", // ✅ "technical" → "Programming"
+};
+
+// ─── Pre-save: normalize skill level & category to Title Case ─────────────
+resumeSchema.pre("save", function (next) {
   this.updatedAt = Date.now();
   this.lastUpdated = Date.now();
+
+  if (this.skills && this.skills.length > 0) {
+    this.skills.forEach((skill) => {
+      // Normalize level
+      if (skill.level) {
+        const normalized = LEVEL_MAP[skill.level.toLowerCase().trim()];
+        if (normalized) skill.level = normalized;
+      }
+      // Normalize category
+      if (skill.category) {
+        const normalized = CATEGORY_MAP[skill.category.toLowerCase().trim()];
+        if (normalized) skill.category = normalized;
+      }
+    });
+  }
+
   next();
 });
 
-// Add index for faster queries
+// Also normalize on findOneAndUpdate / updateOne paths
+resumeSchema.pre("findOneAndUpdate", function (next) {
+  const update = this.getUpdate();
+  const skills = update?.skills || update?.$set?.skills;
+
+  if (Array.isArray(skills)) {
+    skills.forEach((skill) => {
+      if (skill.level) {
+        const normalized = LEVEL_MAP[skill.level.toLowerCase().trim()];
+        if (normalized) skill.level = normalized;
+      }
+      if (skill.category) {
+        const normalized = CATEGORY_MAP[skill.category.toLowerCase().trim()];
+        if (normalized) skill.category = normalized;
+      }
+    });
+  }
+
+  next();
+});
+
+// ─── Indexes ───────────────────────────────────────────────────────────────
 resumeSchema.index({ userId: 1, title: 1 }, { unique: true });
 resumeSchema.index({ isPublic: 1, createdAt: -1 });
 resumeSchema.index({ "skills.name": 1 });
 
-// Virtual field for calculating total experience
-resumeSchema.virtual("totalExperience").get(function() {
+// ─── Virtual: total experience in years ───────────────────────────────────
+resumeSchema.virtual("totalExperience").get(function () {
   if (!this.experience || this.experience.length === 0) return 0;
-  
   let totalMonths = 0;
-  
-  this.experience.forEach(exp => {
+  this.experience.forEach((exp) => {
     const startDate = exp.startDate;
     const endDate = exp.currentlyWorking ? new Date() : exp.endDate || new Date();
-    
     if (startDate && endDate) {
-      const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
-                    (endDate.getMonth() - startDate.getMonth());
+      const months =
+        (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+        (endDate.getMonth() - startDate.getMonth());
       totalMonths += Math.max(0, months);
     }
   });
-  
-  return Math.floor(totalMonths / 12); // Return years
+  return Math.floor(totalMonths / 12);
 });
 
-// Method to get formatted resume data
-resumeSchema.methods.getFormattedData = function() {
+// ─── Instance method: formatted data ──────────────────────────────────────
+resumeSchema.methods.getFormattedData = function () {
   return {
     id: this._id,
     title: this.title,
@@ -332,73 +389,55 @@ resumeSchema.methods.getFormattedData = function() {
     downloadCount: this.downloadCount,
     totalExperience: this.totalExperience,
     createdAt: this.createdAt,
-    updatedAt: this.updatedAt
+    updatedAt: this.updatedAt,
   };
 };
 
-// Method to extract skills for job recommendations
-resumeSchema.methods.extractSkillsForRecommendations = function() {
+// ─── Instance method: extract skills for job recommendations ──────────────
+resumeSchema.methods.extractSkillsForRecommendations = function () {
   const skills = [];
-  
-  // Add skills from skills section
-  if (this.skills && this.skills.length > 0) {
-    this.skills.forEach(skill => {
-      if (typeof skill === 'string') {
-        skills.push(skill);
-      } else if (skill.name) {
-        skills.push(skill.name);
-      }
+  if (this.skills?.length > 0) {
+    this.skills.forEach((skill) => {
+      skills.push(typeof skill === "string" ? skill : skill.name);
     });
   }
-  
-  // Add technologies from experience
-  if (this.experience && this.experience.length > 0) {
-    this.experience.forEach(exp => {
-      if (exp.technologies && Array.isArray(exp.technologies)) {
-        skills.push(...exp.technologies);
-      }
+  if (this.experience?.length > 0) {
+    this.experience.forEach((exp) => {
+      if (Array.isArray(exp.technologies)) skills.push(...exp.technologies);
     });
   }
-  
-  // Add technologies from projects
-  if (this.projects && this.projects.length > 0) {
-    this.projects.forEach(project => {
-      if (project.technologies && Array.isArray(project.technologies)) {
-        skills.push(...project.technologies);
-      }
+  if (this.projects?.length > 0) {
+    this.projects.forEach((project) => {
+      if (Array.isArray(project.technologies)) skills.push(...project.technologies);
     });
   }
-  
-  // Remove duplicates and return
   return [...new Set(skills)];
 };
 
-// Static method to find public resumes
-resumeSchema.statics.findPublicResumes = function(options = {}) {
-  const { page = 1, limit = 10, sortBy = '-createdAt' } = options;
-  const skip = (page - 1) * limit;
-  
+// ─── Static: find public resumes ──────────────────────────────────────────
+resumeSchema.statics.findPublicResumes = function (options = {}) {
+  const { page = 1, limit = 10, sortBy = "-createdAt" } = options;
   return this.find({ isPublic: true })
-    .populate('userId', 'name email')
+    .populate("userId", "name email")
     .sort(sortBy)
-    .skip(skip)
+    .skip((page - 1) * limit)
     .limit(limit);
 };
 
-// Static method to get resume statistics
-resumeSchema.statics.getUserStats = function(userId) {
+// ─── Static: user stats ───────────────────────────────────────────────────
+resumeSchema.statics.getUserStats = function (userId) {
   return this.aggregate([
     { $match: { userId: mongoose.Types.ObjectId(userId) } },
     {
       $group: {
         _id: null,
-        totalResumes: { $sum: 1 },
-        publicResumes: { $sum: { $cond: ["$isPublic", 1, 0] } },
+        totalResumes:    { $sum: 1 },
+        publicResumes:   { $sum: { $cond: ["$isPublic", 1, 0] } },
         featuredResumes: { $sum: { $cond: ["$isFeatured", 1, 0] } },
-        totalViews: { $sum: "$viewCount" },
-        totalDownloads: { $sum: "$downloadCount" }
-      }
-    }
+        totalViews:      { $sum: "$viewCount" },
+        totalDownloads:  { $sum: "$downloadCount" },
+      },
+    },
   ]);
 };
 
