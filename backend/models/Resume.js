@@ -200,8 +200,6 @@ const resumeSchema = new mongoose.Schema({
       required: [true, "Skill name is required"],
       trim: true
     },
-    // ✅ FIXED: normalize to Title Case before save via pre-save hook
-    // Accepts any casing from frontend — beginner/Beginner/BEGINNER all work
     level: {
       type: String,
       enum: ["Beginner", "Intermediate", "Advanced", "Expert"],
@@ -292,16 +290,16 @@ const LEVEL_MAP = {
 };
 
 const CATEGORY_MAP = {
-  programming: "Programming",
-  framework:   "Framework",
-  database:    "Database",
-  tool:        "Tool",
-  tools:       "Tool",        // ✅ "tools" → "Tool"
-  language:    "Language",
-  "soft skill":"Soft Skill",
-  softskill:   "Soft Skill",
-  other:       "Other",
-  technical:   "Programming", // ✅ "technical" → "Programming"
+  programming:  "Programming",
+  framework:    "Framework",
+  database:     "Database",
+  tool:         "Tool",
+  tools:        "Tool",
+  language:     "Language",
+  "soft skill": "Soft Skill",
+  softskill:    "Soft Skill",
+  other:        "Other",
+  technical:    "Programming",
 };
 
 // ─── Pre-save: normalize skill level & category to Title Case ─────────────
@@ -311,12 +309,10 @@ resumeSchema.pre("save", function (next) {
 
   if (this.skills && this.skills.length > 0) {
     this.skills.forEach((skill) => {
-      // Normalize level
       if (skill.level) {
         const normalized = LEVEL_MAP[skill.level.toLowerCase().trim()];
         if (normalized) skill.level = normalized;
       }
-      // Normalize category
       if (skill.category) {
         const normalized = CATEGORY_MAP[skill.category.toLowerCase().trim()];
         if (normalized) skill.category = normalized;
@@ -349,7 +345,9 @@ resumeSchema.pre("findOneAndUpdate", function (next) {
 });
 
 // ─── Indexes ───────────────────────────────────────────────────────────────
-resumeSchema.index({ userId: 1, title: 1 }, { unique: true });
+// ✅ FIXED: removed { unique: true } from userId+title index
+// unique constraint caused E11000 duplicate key error on resume updates
+resumeSchema.index({ userId: 1, title: 1 });
 resumeSchema.index({ isPublic: 1, createdAt: -1 });
 resumeSchema.index({ "skills.name": 1 });
 

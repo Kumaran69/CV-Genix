@@ -18,9 +18,11 @@ export default function App() {
           <Route path="/dashboard"          element={<Dashboard />} />
           <Route path="/template-selection" element={<TemplateSelection />} />
 
+
           {/* Resume Builder: new resume + edit existing */}
           <Route path="/builder"            element={<ResumeBuilder />} />
           <Route path="/builder/:id"        element={<ResumeBuilder />} />
+          
 
           {/* Resume Preview */}
           <Route path="/preview/:id"        element={<ResumePreview />} />

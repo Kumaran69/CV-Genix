@@ -8,14 +8,18 @@ const API = axios.create({
 });
 
 /* ── Attach token from storage (auto on every request) ───────────────────── */
-// Token is read from storage on every request so it's always fresh.
-// Dashboard/ResumeBuilder pass token as a param too — that's fine,
-// but the interceptor handles it automatically so no manual header needed.
+// The interceptor reads the token fresh on every request.
+// Functions that receive a token param pass it via headers directly too —
+// both paths are safe; interceptor is the fallback if param is omitted.
 API.interceptors.request.use((req) => {
-  const token =
-    localStorage.getItem("token") ||
-    sessionStorage.getItem("token");
-  if (token) req.headers.Authorization = `Bearer ${token}`;
+  // Prefer explicitly-set Authorization (set below in each function)
+  // Only auto-attach from storage if not already set
+  if (!req.headers.Authorization) {
+    const token =
+      localStorage.getItem("token") ||
+      sessionStorage.getItem("token");
+    if (token) req.headers.Authorization = `Bearer ${token}`;
+  }
 
   if (import.meta.env.DEV) {
     console.log(`🚀 ${req.method.toUpperCase()} ${req.baseURL}${req.url}`, req.data);
@@ -83,7 +87,7 @@ const PROFICIENCY_MAP = {
   beginner:        "Basic",
   elementary:      "Basic",
   conversational:  "Conversational",
-  intermediate:    "Conversational",  // ✅ fixes `intermediate` not valid
+  intermediate:    "Conversational",
   moderate:        "Conversational",
   professional:    "Professional",
   advanced:        "Professional",
@@ -97,7 +101,7 @@ const PROFICIENCY_MAP = {
 /* ── Clean + normalize resume data before sending to API ─────────────────── */
 const cleanResumeData = (data) => {
   if (!data) return data;
-  if (data.test === true) return data; // skip test/health-check calls
+  if (data.test === true) return data;
 
   const cleaned = JSON.parse(JSON.stringify(data));
 
@@ -170,41 +174,51 @@ const cleanResumeData = (data) => {
   return cleaned;
 };
 
+/* ── Auth header helper ──────────────────────────────────────────────────── */
+// Builds the config object with Authorization header.
+// If token param is provided, it takes priority over storage.
+// If not provided, the interceptor will attach from storage automatically.
+const authConfig = (token) =>
+  token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+
 /* ── Auth APIs ───────────────────────────────────────────────────────────── */
 export const signup = (data) => API.post("/auth/signup", data);
 export const login  = (data) => API.post("/auth/login",  data);
 
 /* ── Resume APIs ─────────────────────────────────────────────────────────── */
 
-// ✅ getResumes — Dashboard calls getResumes(token) but token is ignored
-//    because the interceptor handles auth automatically. Safe either way.
-export const getResumes = (_token) => API.get("/resumes");
+// ✅ getResumes — token param accepted but interceptor also handles it
+export const getResumes = (token) => API.get("/resumes", authConfig(token));
 
-// ✅ getResumeById — called as getResumeById(id) from ResumeBuilder/Preview
-export const getResumeById = (id) => API.get(`/resumes/${id}`);
+// ✅ getResumeById — token param accepted for explicit auth
+//    ResumeBuilder now calls: getResumeById(id, token)
+export const getResumeById = (id, token) => API.get(`/resumes/${id}`, authConfig(token));
 
-// ✅ createResume — called as createResume(data)
-export const createResume = (data) => API.post("/resumes", cleanResumeData(data));
+// ✅ createResume — token param accepted
+//    ResumeBuilder now calls: createResume(data, token)
+export const createResume = (data, token) =>
+  API.post("/resumes", cleanResumeData(data), authConfig(token));
 
-// ✅ updateResume — called as updateResume(id, data)
-export const updateResume = (id, data) => API.put(`/resumes/${id}`, cleanResumeData(data));
+// ✅ updateResume — token param accepted
+//    ResumeBuilder now calls: updateResume(id, data, token)
+export const updateResume = (id, data, token) =>
+  API.put(`/resumes/${id}`, cleanResumeData(data), authConfig(token));
 
-// ✅ deleteResume — Dashboard calls deleteResume(id, token)
-//    second arg (token) is unused; interceptor handles auth
-export const deleteResume = (id, _token) => API.delete(`/resumes/${id}`);
+// ✅ deleteResume — token param accepted
+//    Dashboard calls: deleteResume(id, token)
+export const deleteResume = (id, token) =>
+  API.delete(`/resumes/${id}`, authConfig(token));
 
-// ✅ saveResume — called as API.post("/resumes/save", data) from ResumeBuilder
-//    also exported for direct use with fallback
-export const saveResume = async (data) => {
+// ✅ saveResume — upsert with fallback, token param accepted
+export const saveResume = async (data, token) => {
   const cleanedData = cleanResumeData(data);
+  const config      = authConfig(token);
   try {
-    // Try POST /resumes first (RESTful create)
-    return await API.post("/resumes", cleanedData);
+    return await API.post("/resumes", cleanedData, config);
   } catch (err) {
-    // Fallback to /resumes/save (upsert endpoint)
     if (err.response?.status === 404 || err.response?.status === 409) {
       console.log("Falling back to /resumes/save endpoint");
-      return await API.post("/resumes/save", cleanedData);
+      return await API.post("/resumes/save", cleanedData, config);
     }
     throw err;
   }
@@ -234,5 +248,5 @@ export const checkResumeEndpoints = async () => {
   return results;
 };
 
-/* ── Export axios instance for direct use (ResumeBuilder uses API.post) ─── */
+/* ── Export axios instance for direct use ────────────────────────────────── */
 export { API };

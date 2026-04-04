@@ -2,9 +2,6 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, Check, Search, X, TrendingUp, Star, Zap } from "lucide-react";
 
-// ─────────────────────────────────────────
-// Design tokens (consistent with full app)
-// ─────────────────────────────────────────
 const C = {
   bgBase:       "#080c18",
   bgPrimary:    "#0d1220",
@@ -28,9 +25,6 @@ const C = {
   textAccent:   "#60a5fa",
 };
 
-// ─────────────────────────────────────────
-// Template data
-// ─────────────────────────────────────────
 const TEMPLATES = [
   {
     id: "classic",
@@ -92,9 +86,6 @@ const TEMPLATES = [
 const CATEGORIES = ["All", "Professional", "Creative", "Minimalist"];
 const POPULAR_IDS = ["modern", "classic", "tech"];
 
-// ─────────────────────────────────────────
-// Resume skeleton preview (abstract wireframe)
-// ─────────────────────────────────────────
 function ResumeWireframe({ accent, bg }) {
   const line = (w, op = 0.25) => (
     <div style={{ height: 6, borderRadius: 3, background: `rgba(255,255,255,${op})`, width: w, marginBottom: 5 }} />
@@ -102,47 +93,31 @@ function ResumeWireframe({ accent, bg }) {
   const block = (h, op = 0.15) => (
     <div style={{ height: h, borderRadius: 4, background: `rgba(255,255,255,${op})`, marginBottom: 6 }} />
   );
-
   return (
     <div style={{ background: bg, borderRadius: 8, overflow: "hidden", height: "100%", padding: 12, position: "relative" }}>
-      {/* Header area */}
       <div style={{ marginBottom: 10 }}>
         {line("60%", 0.5)}
         {line("40%", 0.3)}
         {line("80%", 0.18)}
       </div>
-      {/* Two-col content */}
       <div style={{ display: "flex", gap: 8 }}>
         <div style={{ flex: 2 }}>
-          {block(5, 0.35)}
-          {block(3)}
-          {block(3)}
+          {block(5, 0.35)}{block(3)}{block(3)}
           <div style={{ height: 4 }} />
-          {block(5, 0.35)}
-          {block(3)}
-          {block(3)}
+          {block(5, 0.35)}{block(3)}{block(3)}
         </div>
         <div style={{ flex: 1 }}>
-          {block(5, 0.35)}
-          {block(3)}
-          {block(3)}
-          {block(3)}
+          {block(5, 0.35)}{block(3)}{block(3)}{block(3)}
           <div style={{ height: 4 }} />
-          {block(5, 0.35)}
-          {block(3)}
-          {block(3)}
+          {block(5, 0.35)}{block(3)}{block(3)}
         </div>
       </div>
     </div>
   );
 }
 
-// ─────────────────────────────────────────
-// Template Card
-// ─────────────────────────────────────────
 function TemplateCard({ template, isSelected, onSelect }) {
   const [hover, setHover] = useState(false);
-
   return (
     <div
       onClick={() => onSelect(template.id)}
@@ -152,21 +127,16 @@ function TemplateCard({ template, isSelected, onSelect }) {
         borderRadius: 14,
         border: `1.5px solid ${isSelected ? C.borderSel : hover ? C.borderAccent : C.border}`,
         background: isSelected ? "rgba(59,130,246,0.07)" : hover ? C.bgHover : C.bgCard,
-        cursor: "pointer",
-        transition: "all 0.18s",
+        cursor: "pointer", transition: "all 0.18s",
         transform: hover && !isSelected ? "translateY(-2px)" : "translateY(0)",
         boxShadow: isSelected ? `0 0 0 3px ${C.accentDim}, 0 8px 24px rgba(0,0,0,0.3)` : hover ? "0 8px 24px rgba(0,0,0,0.25)" : "none",
-        overflow: "hidden",
-        position: "relative",
+        overflow: "hidden", position: "relative",
       }}
     >
-      {/* Selected indicator line */}
       {isSelected && (
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: "linear-gradient(90deg, #1d4ed8, #3b82f6, #6366f1)", borderRadius: "14px 14px 0 0" }} />
       )}
-
       <div style={{ padding: 16 }}>
-        {/* Header row */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
@@ -187,7 +157,6 @@ function TemplateCard({ template, isSelected, onSelect }) {
             </div>
             <span style={{ fontSize: 11, color: C.textMuted }}>{template.category}</span>
           </div>
-
           {isSelected ? (
             <div style={{
               width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
@@ -201,30 +170,20 @@ function TemplateCard({ template, isSelected, onSelect }) {
             <div style={{ width: 22, height: 22, borderRadius: "50%", border: `1.5px solid ${C.border}` }} />
           )}
         </div>
-
-        {/* Wireframe preview */}
         <div style={{ height: 100, marginBottom: 12, borderRadius: 8, overflow: "hidden" }}>
           <ResumeWireframe accent={template.previewAccent} bg={template.previewBg} />
         </div>
-
-        {/* Description */}
         <p style={{ fontSize: 12, color: C.textSec, lineHeight: 1.55, marginBottom: 10, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
           {template.description}
         </p>
-
-        {/* Feature pills */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 10 }}>
           {template.features.slice(0, 2).map((f, i) => (
             <span key={i} style={{
               fontSize: 10.5, padding: "2px 7px", borderRadius: 4, fontWeight: 500,
               background: "rgba(255,255,255,0.05)", color: C.textSec, border: `1px solid ${C.border}`,
-            }}>
-              {f}
-            </span>
+            }}>{f}</span>
           ))}
         </div>
-
-        {/* Footer */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <Star size={11} color="#fbbf24" fill="#fbbf24" />
@@ -239,16 +198,13 @@ function TemplateCard({ template, isSelected, onSelect }) {
   );
 }
 
-// ─────────────────────────────────────────
-// Main Component
-// ─────────────────────────────────────────
 export default function TemplateSelection() {
   const navigate  = useNavigate();
   const location  = useLocation();
 
-  const [selected,  setSelected]  = useState("classic");
-  const [search,    setSearch]    = useState("");
-  const [category,  setCategory]  = useState("All");
+  const [selected,   setSelected]   = useState("classic");
+  const [search,     setSearch]     = useState("");
+  const [category,   setCategory]   = useState("All");
   const [resumeData, setResumeData] = useState(null);
 
   useEffect(() => {
@@ -267,18 +223,39 @@ export default function TemplateSelection() {
 
   const selectedData = TEMPLATES.find(t => t.id === selected);
 
+  // ✅ FIXED: navigate(-1, { state }) silently drops state in React Router.
+  // Instead navigate to the exact route with state so ResumeBuilder receives it.
   const applyTemplate = () => {
-    const updated = resumeData ? { ...resumeData, template: selected } : { template: selected };
-    navigate("/pages/ResumeBuilder", { state: { resume: updated } });
+    const updated = { ...(resumeData || {}), template: selected };
+    const resumeId = resumeData?._id || resumeData?.id || null;
+
+    if (resumeId) {
+      // Editing an existing resume — go to /resume/edit/:id
+      navigate(`/builder/${id}`, {
+        state: { resume: updated, selectedTemplate: selected },
+      });
+    } else {
+      // New resume — go to the builder without an id
+      navigate("/builder/${id}", {
+        state: { resume: updated, selectedTemplate: selected },
+      });
+    }
   };
 
+  // ✅ FIXED: same issue — navigate(-1) drops state, use explicit path
   const goBack = () => {
-    navigate("/pages/ResumeBuilder", { state: resumeData ? { resume: resumeData } : {} });
+    const resumeId = resumeData?._id || resumeData?.id || null;
+    if (resumeId) {
+      navigate(`/builder/${id}`, {
+        state: { resume: resumeData },
+      });
+    } else {
+      navigate("/builder/${id}", {
+        state: { resume: resumeData || {} },
+      });
+    }
   };
 
-  // ─────────────────────────────────────────
-  // RENDER
-  // ─────────────────────────────────────────
   return (
     <>
       <style>{`
@@ -298,16 +275,13 @@ export default function TemplateSelection() {
         display: "flex", flexDirection: "column",
       }}>
 
-        {/* ══════════════════════════════
-            HEADER
-        ══════════════════════════════ */}
+        {/* ══ HEADER ══ */}
         <header style={{
           position: "sticky", top: 0, zIndex: 50,
           background: "rgba(8,12,24,0.88)", backdropFilter: "blur(16px)",
           borderBottom: `1px solid ${C.border}`,
         }}>
           <div style={{ maxWidth: 1280, margin: "0 auto", padding: "14px 24px" }}>
-            {/* Top row */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <button
@@ -322,7 +296,6 @@ export default function TemplateSelection() {
                 >
                   <ArrowLeft size={16} />
                 </button>
-
                 <div>
                   <h1 className="ts-display" style={{ fontSize: 20, fontWeight: 700, color: C.textPrimary, margin: 0, lineHeight: 1.2 }}>
                     Choose Template
@@ -332,8 +305,6 @@ export default function TemplateSelection() {
                   </p>
                 </div>
               </div>
-
-              {/* Apply CTA — header */}
               <button
                 onClick={applyTemplate}
                 style={{
@@ -350,9 +321,7 @@ export default function TemplateSelection() {
               </button>
             </div>
 
-            {/* Search + category filter row */}
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {/* Search */}
               <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
                 <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: C.textMuted, pointerEvents: "none" }} />
                 <input
@@ -364,8 +333,7 @@ export default function TemplateSelection() {
                     width: "100%", padding: "9px 36px 9px 36px",
                     background: C.bgPrimary, border: `1px solid ${C.border}`,
                     borderRadius: 9, color: C.textPrimary, fontSize: 13,
-                    outline: "none", fontFamily: "inherit",
-                    transition: "border-color 0.15s",
+                    outline: "none", fontFamily: "inherit", transition: "border-color 0.15s",
                   }}
                   onFocus={e => { e.target.style.borderColor = C.borderAccent; e.target.style.boxShadow = `0 0 0 3px ${C.accentDim}`; }}
                   onBlur={e => { e.target.style.borderColor = C.border; e.target.style.boxShadow = "none"; }}
@@ -373,33 +341,23 @@ export default function TemplateSelection() {
                 {search && (
                   <button
                     onClick={() => setSearch("")}
-                    style={{
-                      position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
-                      background: "none", border: "none", cursor: "pointer", color: C.textMuted, display: "flex",
-                    }}
+                    style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: C.textMuted, display: "flex" }}
                   >
                     <X size={14} />
                   </button>
                 )}
               </div>
-
-              {/* Category pills */}
               <div style={{ display: "flex", gap: 6, overflowX: "auto", flexShrink: 0 }}>
                 {CATEGORIES.map(cat => {
                   const active = category === cat;
                   return (
-                    <button
-                      key={cat}
-                      onClick={() => setCategory(cat)}
-                      style={{
-                        padding: "8px 14px", borderRadius: 9, fontSize: 12.5, fontWeight: 600,
-                        border: `1px solid ${active ? C.borderAccent : C.border}`,
-                        background: active ? C.accentDim : "rgba(255,255,255,0.02)",
-                        color: active ? C.accentBright : C.textMuted,
-                        cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.15s",
-                        fontFamily: "inherit",
-                      }}
-                    >
+                    <button key={cat} onClick={() => setCategory(cat)} style={{
+                      padding: "8px 14px", borderRadius: 9, fontSize: 12.5, fontWeight: 600,
+                      border: `1px solid ${active ? C.borderAccent : C.border}`,
+                      background: active ? C.accentDim : "rgba(255,255,255,0.02)",
+                      color: active ? C.accentBright : C.textMuted,
+                      cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.15s", fontFamily: "inherit",
+                    }}>
                       {cat}
                     </button>
                   );
@@ -409,28 +367,21 @@ export default function TemplateSelection() {
           </div>
         </header>
 
-        {/* ══════════════════════════════
-            MAIN
-        ══════════════════════════════ */}
+        {/* ══ MAIN ══ */}
         <main style={{ flex: 1, maxWidth: 1280, margin: "0 auto", padding: "28px 24px", width: "100%" }}>
 
-          {/* Selected template preview card */}
           {selectedData && (
             <div className="fade-up" style={{
               borderRadius: 16, overflow: "hidden", marginBottom: 32,
               background: C.bgCard, border: `1px solid ${C.borderAccent}`,
               boxShadow: `0 0 0 1px ${C.accentDim}, 0 8px 32px rgba(0,0,0,0.35)`,
             }}>
-              {/* Accent top bar */}
               <div style={{ height: 3, background: "linear-gradient(90deg, #1d4ed8, #3b82f6, #6366f1)" }} />
-
               <div style={{ padding: "20px 24px", display: "flex", flexWrap: "wrap", gap: 20, alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-                  {/* Preview thumb */}
                   <div style={{ width: 100, height: 70, borderRadius: 8, overflow: "hidden", flexShrink: 0 }}>
                     <ResumeWireframe accent={selectedData.previewAccent} bg={selectedData.previewBg} />
                   </div>
-
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                       <span className="ts-display" style={{ fontSize: 18, fontWeight: 700, color: C.textPrimary }}>{selectedData.name}</span>
@@ -448,7 +399,6 @@ export default function TemplateSelection() {
                     </div>
                   </div>
                 </div>
-
                 <button
                   onClick={applyTemplate}
                   style={{
@@ -467,7 +417,6 @@ export default function TemplateSelection() {
             </div>
           )}
 
-          {/* Popular section */}
           <div style={{ marginBottom: 32 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
               <TrendingUp size={15} color="#d97706" />
@@ -481,23 +430,17 @@ export default function TemplateSelection() {
             </div>
           </div>
 
-          {/* All templates */}
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
               <span style={{ fontSize: 13.5, fontWeight: 700, color: C.textPrimary }}>All Templates</span>
-              <span style={{ fontSize: 12, color: C.textMuted }}>
-                {filtered.length} of {TEMPLATES.length} templates
-              </span>
+              <span style={{ fontSize: 12, color: C.textMuted }}>{filtered.length} of {TEMPLATES.length} templates</span>
             </div>
-
             {filtered.length === 0 ? (
               <div style={{ textAlign: "center", padding: "56px 24px", borderRadius: 14, border: `1px dashed ${C.border}` }}>
                 <Search size={36} color={C.textMuted} style={{ margin: "0 auto 12px" }} />
                 <p style={{ fontSize: 14, color: C.textSec, marginBottom: 10 }}>No templates match your search</p>
-                <button
-                  onClick={() => { setSearch(""); setCategory("All"); }}
-                  style={{ fontSize: 13, color: C.accentBright, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
-                >
+                <button onClick={() => { setSearch(""); setCategory("All"); }}
+                  style={{ fontSize: 13, color: C.accentBright, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
                   Clear filters
                 </button>
               </div>
@@ -511,35 +454,25 @@ export default function TemplateSelection() {
           </div>
         </main>
 
-        {/* ══════════════════════════════
-            STICKY BOTTOM BAR
-        ══════════════════════════════ */}
+        {/* ══ STICKY BOTTOM BAR ══ */}
         <div style={{
           position: "sticky", bottom: 0, zIndex: 40,
           background: "rgba(8,12,24,0.94)", backdropFilter: "blur(16px)",
           borderTop: `1px solid ${C.border}`,
         }}>
           <div style={{
-            maxWidth: 1280, margin: "0 auto",
-            padding: "12px 24px",
+            maxWidth: 1280, margin: "0 auto", padding: "12px 24px",
             display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12,
           }}>
-            {/* Selected info */}
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ width: 36, height: 28, borderRadius: 6, overflow: "hidden", flexShrink: 0 }}>
                 {selectedData && <ResumeWireframe accent={selectedData.previewAccent} bg={selectedData.previewBg} />}
               </div>
               <div>
-                <p style={{ fontSize: 13, fontWeight: 600, color: C.textPrimary, margin: 0 }}>
-                  {selectedData?.name} Template
-                </p>
-                <p style={{ fontSize: 11, color: C.textMuted, margin: 0 }}>
-                  {selectedData?.features.join(" · ")}
-                </p>
+                <p style={{ fontSize: 13, fontWeight: 600, color: C.textPrimary, margin: 0 }}>{selectedData?.name} Template</p>
+                <p style={{ fontSize: 11, color: C.textMuted, margin: 0 }}>{selectedData?.features.join(" · ")}</p>
               </div>
             </div>
-
-            {/* Actions */}
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 onClick={goBack}
@@ -554,7 +487,6 @@ export default function TemplateSelection() {
               >
                 Back
               </button>
-
               <button
                 onClick={applyTemplate}
                 style={{
