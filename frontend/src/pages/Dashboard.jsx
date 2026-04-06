@@ -16,7 +16,6 @@ import MarketDashboard from "../components/market-analytics/MarketDashboard";
 import ATSDashboard   from "../components/ats/ATSDashboard";
 import KeywordOptimizer from "../components/ats/KeywordOptimizer";
 
-
 export default function Dashboard() {
   const { token, logoutUser, user } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -109,12 +108,11 @@ export default function Dashboard() {
   // ── Navigation handlers ───────────────────────────────────────────────
 
   // ✅ Edit → /builder/:id
- // ✅ Should be this (relative path — React Router handles it)
-const handleEdit = (resume) => {
-  const id = getResumeId(resume);
-  if (!id) return;
-  navigate(`/builder/${id}`);  // ← just /builder/:id, no domain
-};
+  const handleEdit = (resume) => {
+    const id = getResumeId(resume);
+    if (!id) { console.error("Edit failed — no valid ID:", resume); return; }
+    navigate(`/builder/${id}`);
+  };
 
   // ✅ Preview → /preview/:id
   const handlePreview = (resume) => {
