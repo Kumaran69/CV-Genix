@@ -1,14 +1,24 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  server: {
-    port: 5173, // Set the port
-    host: true, // Allow external access
-    open: true, // Auto open browser
-  },
   build: {
-    outDir: "dist",
+    chunkSizeWarningLimit: 1000, // raise warning limit to 1000kb
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Split vendor libraries into separate chunks
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'icons': ['lucide-react'],
+          'axios': ['axios'],
+        }
+      }
+    }
   },
-});
+  server: {
+    proxy: {
+      '/api': 'http://localhost:5000'
+    }
+  }
+})
