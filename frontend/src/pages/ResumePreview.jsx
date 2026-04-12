@@ -27,7 +27,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 
-// ── Format date from ISO string or plain string ───────────────────────────
+const ALL_TEMPLATES = ["modern", "classic", "minimal", "creative", "tech"];
+
 function formatDate(dateStr) {
   if (!dateStr) return "";
   try {
@@ -39,21 +40,20 @@ function formatDate(dateStr) {
   }
 }
 
-// ── Skill name helper — handles string or { name } object ─────────────────
 function skillName(skill) {
   return typeof skill === "string" ? skill : skill?.name || "";
 }
 
 export default function ResumePreview() {
-  const { id }        = useParams();
-  const { token }     = useContext(AuthContext);
-  const navigate      = useNavigate();
+  const { id }    = useParams();
+  const { token } = useContext(AuthContext);
+  const navigate  = useNavigate();
 
-  const [resume,          setResume]          = useState(null);
-  const [loading,         setLoading]         = useState(true);
-  const [error,           setError]           = useState(null);
-  const [activeTemplate,  setActiveTemplate]  = useState("modern");
-  const [copied,          setCopied]          = useState(false);
+  const [resume,         setResume]         = useState(null);
+  const [loading,        setLoading]        = useState(true);
+  const [error,          setError]          = useState(null);
+  const [activeTemplate, setActiveTemplate] = useState("modern");
+  const [copied,         setCopied]         = useState(false);
 
   useEffect(() => {
     if (!token) { navigate("/login"); return; }
@@ -65,7 +65,6 @@ export default function ResumePreview() {
     try {
       setLoading(true);
       const response = await getResumeById(id);
-      // ✅ backend wraps in { success, resume } — unwrap correctly
       const data = response.data?.resume || response.data;
       setResume(data);
       if (data?.template) setActiveTemplate(data.template);
@@ -95,7 +94,6 @@ export default function ResumePreview() {
     }
   };
 
-  // ── Loading ───────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -107,7 +105,6 @@ export default function ResumePreview() {
     );
   }
 
-  // ── Error ─────────────────────────────────────────────────────────────
   if (error || !resume) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -130,254 +127,174 @@ export default function ResumePreview() {
     );
   }
 
-  // ── Shared section data ───────────────────────────────────────────────
-  const p            = resume.personal || {};
-  // ✅ summary lives in personal.summary, not resume.summary
-  const summary      = p.summary || "";
-  const experience   = resume.experience   || [];
-  const education    = resume.education    || [];
-  const skills       = resume.skills       || [];
+  const p              = resume.personal       || {};
+  const summary        = p.summary             || "";
+  const experience     = resume.experience     || [];
+  const education      = resume.education      || [];
+  const skills         = resume.skills         || [];
   const certifications = resume.certifications || [];
-  const projects     = resume.projects     || [];
-  const languages    = resume.languages    || [];
+  const projects       = resume.projects       || [];
+  const languages      = resume.languages      || [];
+  const atsScore       = resume.atsScore       ?? 85;
 
-  // ── ATS score (calculated or stored) ──────────────────────────────────
-  const atsScore = resume.atsScore ?? 85;
+  // ─── Shared section renderers (reused across templates) ───────────────
+
+  const ExperienceItems = ({ accentClass = "border-blue-600", tagClass = "bg-blue-50 text-blue-600" }) =>
+    experience.map((exp, idx) => (
+      <div key={idx} className={`border-l-4 ${accentClass} pl-4`}>
+        <div className="flex justify-between items-start flex-wrap gap-2">
+          <div>
+            <h3 className="font-semibold text-gray-900">{exp.role || exp.title}</h3>
+            <p className="text-gray-600 text-sm">
+              {exp.company}
+              {exp.location       ? ` · ${exp.location}`       : ""}
+              {exp.employmentType ? ` · ${exp.employmentType}` : ""}
+            </p>
+          </div>
+          <span className="text-sm text-gray-500 flex items-center gap-1 flex-shrink-0">
+            <Calendar className="w-3 h-3" />
+            {formatDate(exp.startDate)} — {exp.currentlyWorking ? "Present" : formatDate(exp.endDate)}
+          </span>
+        </div>
+        {exp.description && <p className="text-gray-700 mt-2 text-sm leading-relaxed">{exp.description}</p>}
+        {exp.achievements?.length > 0 && (
+          <ul className="mt-2 space-y-1">
+            {exp.achievements.map((a, i) => (
+              <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" /> {a}
+              </li>
+            ))}
+          </ul>
+        )}
+        {exp.technologies?.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {exp.technologies.map((tech, i) => (
+              <span key={i} className={`text-xs px-2 py-0.5 rounded-full ${tagClass}`}>{tech}</span>
+            ))}
+          </div>
+        )}
+      </div>
+    ));
 
   // ══════════════════════════════════════════════════════════════════════
-  // MODERN TEMPLATE
+  // 1. MODERN — blue-purple gradient header
   // ══════════════════════════════════════════════════════════════════════
-  const renderModernTemplate = () => (
+  const renderModern = () => (
     <div className="bg-white rounded-xl shadow-lg overflow-hidden print:shadow-none print:rounded-none">
-
-      {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-10 text-white">
         <div className="flex justify-between items-start gap-4">
           <div>
             <h1 className="text-4xl font-bold mb-1">{p.name || "Your Name"}</h1>
-            <p className="text-xl text-blue-100 mb-4">{p.title || ""}</p>
-
+            <p className="text-xl text-blue-100 mb-4">{p.title}</p>
             <div className="flex flex-wrap gap-4 text-sm text-blue-100">
-              {p.email    && <a href={`mailto:${p.email}`}    className="flex items-center gap-1.5 hover:text-white"><Mail    className="w-4 h-4" />{p.email}</a>}
-              {p.phone    && <a href={`tel:${p.phone}`}       className="flex items-center gap-1.5 hover:text-white"><Phone   className="w-4 h-4" />{p.phone}</a>}
-              {p.location && <span                            className="flex items-center gap-1.5"><MapPin  className="w-4 h-4" />{p.location || [p.city, p.country].filter(Boolean).join(", ")}</span>}
+              {p.email    && <a href={`mailto:${p.email}`} className="flex items-center gap-1.5 hover:text-white"><Mail className="w-4 h-4" />{p.email}</a>}
+              {p.phone    && <a href={`tel:${p.phone}`}    className="flex items-center gap-1.5 hover:text-white"><Phone className="w-4 h-4" />{p.phone}</a>}
+              {p.location && <span className="flex items-center gap-1.5"><MapPin className="w-4 h-4" />{p.location}</span>}
               {p.linkedin && <a href={p.linkedin} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 hover:text-white"><Linkedin className="w-4 h-4" />LinkedIn</a>}
               {p.github   && <a href={p.github}   target="_blank" rel="noreferrer" className="flex items-center gap-1.5 hover:text-white"><Github   className="w-4 h-4" />GitHub</a>}
               {p.portfolio && <a href={p.portfolio} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 hover:text-white"><Globe   className="w-4 h-4" />Portfolio</a>}
             </div>
           </div>
-
           {resume.aiEnhanced && (
             <div className="bg-white/20 backdrop-blur px-3 py-1 rounded-full flex items-center gap-2 flex-shrink-0">
-              <Sparkles className="w-4 h-4" />
-              <span className="text-sm font-medium">AI Enhanced</span>
+              <Sparkles className="w-4 h-4" /><span className="text-sm font-medium">AI Enhanced</span>
             </div>
           )}
         </div>
       </div>
 
-      {/* Body */}
       <div className="p-8 space-y-7">
-
-        {/* Summary */}
         {summary && (
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <User className="w-5 h-5 text-blue-600" /> Professional Summary
-            </h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-3 flex items-center gap-2"><User className="w-5 h-5 text-blue-600" /> Professional Summary</h2>
             <p className="text-gray-700 leading-relaxed">{summary}</p>
           </section>
         )}
-
-        {/* Experience */}
         {experience.length > 0 && (
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Briefcase className="w-5 h-5 text-blue-600" /> Work Experience
-            </h2>
-            <div className="space-y-5">
-              {experience.map((exp, idx) => (
-                <div key={idx} className="border-l-4 border-blue-600 pl-4">
-                  <div className="flex justify-between items-start flex-wrap gap-2">
-                    <div>
-                      {/* ✅ backend field is `role`, not `title` */}
-                      <h3 className="font-semibold text-gray-900">{exp.role || exp.title}</h3>
-                      <p className="text-gray-600 text-sm">
-                        {exp.company}
-                        {exp.location ? ` · ${exp.location}` : ""}
-                        {exp.employmentType ? ` · ${exp.employmentType}` : ""}
-                      </p>
-                    </div>
-                    <span className="text-sm text-gray-500 flex items-center gap-1 flex-shrink-0">
-                      <Calendar className="w-3 h-3" />
-                      {formatDate(exp.startDate)} — {exp.currentlyWorking ? "Present" : formatDate(exp.endDate)}
-                    </span>
-                  </div>
-
-                  {exp.description && (
-                    <p className="text-gray-700 mt-2 text-sm leading-relaxed">{exp.description}</p>
-                  )}
-
-                  {exp.achievements?.length > 0 && (
-                    <ul className="mt-2 space-y-1">
-                      {exp.achievements.map((a, i) => (
-                        <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
-                          <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                          {a}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  {exp.technologies?.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {exp.technologies.map((tech, i) => (
-                        <span key={i} className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">{tech}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2"><Briefcase className="w-5 h-5 text-blue-600" /> Work Experience</h2>
+            <div className="space-y-5"><ExperienceItems /></div>
           </section>
         )}
-
-        {/* Education */}
         {education.length > 0 && (
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <GraduationCap className="w-5 h-5 text-blue-600" /> Education
-            </h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2"><GraduationCap className="w-5 h-5 text-blue-600" /> Education</h2>
             <div className="space-y-3">
               {education.map((edu, idx) => (
                 <div key={idx} className="flex justify-between items-start flex-wrap gap-2">
                   <div>
                     <h3 className="font-semibold text-gray-900">{edu.degree}</h3>
-                    <p className="text-gray-600 text-sm">
-                      {edu.institution}{edu.location ? ` · ${edu.location}` : ""}
-                    </p>
+                    <p className="text-gray-600 text-sm">{edu.institution}{edu.location ? ` · ${edu.location}` : ""}</p>
                     {edu.gpa && <p className="text-xs text-gray-500 mt-0.5">GPA: {edu.gpa}</p>}
                   </div>
-                  <span className="text-sm text-gray-500 flex-shrink-0">
-                    {formatDate(edu.startDate)} — {edu.currentlyStudying ? "Present" : formatDate(edu.endDate)}
-                  </span>
+                  <span className="text-sm text-gray-500 flex-shrink-0">{formatDate(edu.startDate)} — {edu.currentlyStudying ? "Present" : formatDate(edu.endDate)}</span>
                 </div>
               ))}
             </div>
           </section>
         )}
-
-        {/* Projects */}
         {projects.length > 0 && (
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Code className="w-5 h-5 text-blue-600" /> Projects
-            </h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2"><Code className="w-5 h-5 text-blue-600" /> Projects</h2>
             <div className="space-y-4">
-              {projects.map((project, idx) => (
+              {projects.map((pr, idx) => (
                 <div key={idx}>
                   <div className="flex items-center gap-2 flex-wrap">
-                    {/* ✅ backend field is `title`, not `name` */}
-                    <h3 className="font-semibold text-gray-900">{project.title || project.name}</h3>
-                    {project.liveLink && (
-                      <a href={project.liveLink} target="_blank" rel="noreferrer"
-                        className="text-blue-600 hover:underline text-xs flex items-center gap-1">
-                        <ExternalLink className="w-3 h-3" /> Live
-                      </a>
-                    )}
-                    {project.githubLink && (
-                      <a href={project.githubLink} target="_blank" rel="noreferrer"
-                        className="text-gray-600 hover:underline text-xs flex items-center gap-1">
-                        <Github className="w-3 h-3" /> Code
-                      </a>
-                    )}
+                    <h3 className="font-semibold text-gray-900">{pr.title || pr.name}</h3>
+                    {pr.liveLink   && <a href={pr.liveLink}   target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-xs flex items-center gap-1"><ExternalLink className="w-3 h-3" /> Live</a>}
+                    {pr.githubLink && <a href={pr.githubLink} target="_blank" rel="noreferrer" className="text-gray-600 hover:underline text-xs flex items-center gap-1"><Github className="w-3 h-3" /> Code</a>}
                   </div>
-                  {project.description && (
-                    <p className="text-gray-700 text-sm mt-1">{project.description}</p>
-                  )}
-                  {project.technologies?.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {project.technologies.map((tech, i) => (
-                        <span key={i} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{tech}</span>
-                      ))}
-                    </div>
+                  {pr.description && <p className="text-gray-700 text-sm mt-1">{pr.description}</p>}
+                  {pr.technologies?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">{pr.technologies.map((t, i) => <span key={i} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{t}</span>)}</div>
                   )}
                 </div>
               ))}
             </div>
           </section>
         )}
-
-        {/* Skills */}
         {skills.length > 0 && (
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <Code className="w-5 h-5 text-blue-600" /> Skills
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {skills.map((skill, idx) => (
-                <span key={idx} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm">
-                  {skillName(skill)}
-                </span>
-              ))}
-            </div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-3 flex items-center gap-2"><Code className="w-5 h-5 text-blue-600" /> Skills</h2>
+            <div className="flex flex-wrap gap-2">{skills.map((sk, i) => <span key={i} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm">{skillName(sk)}</span>)}</div>
           </section>
         )}
-
-        {/* Certifications */}
         {certifications.length > 0 && (
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <Award className="w-5 h-5 text-blue-600" /> Certifications
-            </h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-3 flex items-center gap-2"><Award className="w-5 h-5 text-blue-600" /> Certifications</h2>
             <div className="space-y-2">
-              {certifications.map((cert, idx) => (
-                <div key={idx} className="flex justify-between items-start flex-wrap gap-2">
-                  <div>
-                    <p className="font-medium text-gray-900">{cert.name}</p>
-                    <p className="text-sm text-gray-600">{cert.issuer}</p>
-                    {cert.credentialId && (
-                      <p className="text-xs text-gray-400">ID: {cert.credentialId}</p>
-                    )}
-                  </div>
-                  <span className="text-sm text-gray-500">{formatDate(cert.issueDate)}</span>
+              {certifications.map((c, i) => (
+                <div key={i} className="flex justify-between items-start flex-wrap gap-2">
+                  <div><p className="font-medium text-gray-900">{c.name}</p><p className="text-sm text-gray-600">{c.issuer}</p></div>
+                  <span className="text-sm text-gray-500">{formatDate(c.issueDate)}</span>
                 </div>
               ))}
             </div>
           </section>
         )}
-
-        {/* Languages */}
         {languages.length > 0 && (
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <Globe className="w-5 h-5 text-blue-600" /> Languages
-            </h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-3 flex items-center gap-2"><Globe className="w-5 h-5 text-blue-600" /> Languages</h2>
             <div className="flex flex-wrap gap-3">
-              {languages.map((lang, idx) => (
-                <span key={idx} className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm">
-                  <span className="font-medium text-gray-900">{lang.name}</span>
-                  {lang.proficiency && (
-                    <span className="text-gray-500 ml-1">· {lang.proficiency}</span>
-                  )}
+              {languages.map((l, i) => (
+                <span key={i} className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm">
+                  <span className="font-medium text-gray-900">{l.name}</span>
+                  {l.proficiency && <span className="text-gray-500 ml-1">· {l.proficiency}</span>}
                 </span>
               ))}
             </div>
           </section>
         )}
-
       </div>
     </div>
   );
 
   // ══════════════════════════════════════════════════════════════════════
-  // CLASSIC TEMPLATE
+  // 2. CLASSIC — traditional black & white
   // ══════════════════════════════════════════════════════════════════════
-  const renderClassicTemplate = () => (
+  const renderClassic = () => (
     <div className="bg-white rounded-xl shadow-lg overflow-hidden print:shadow-none print:rounded-none">
       <div className="p-8">
-
-        {/* Header */}
         <div className="border-b-2 border-gray-300 pb-5 mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-1">{p.name || "Your Name"}</h1>
           {p.title && <p className="text-lg text-gray-600 mb-2">{p.title}</p>}
@@ -390,26 +307,20 @@ export default function ResumePreview() {
           </div>
         </div>
 
-        {/* Summary */}
         {summary && (
           <div className="mb-5">
             <h2 className="text-sm font-bold text-gray-900 uppercase tracking-widest mb-2 border-b border-gray-200 pb-1">Profile</h2>
             <p className="text-gray-700 text-sm leading-relaxed">{summary}</p>
           </div>
         )}
-
-        {/* Experience */}
         {experience.length > 0 && (
           <div className="mb-5">
             <h2 className="text-sm font-bold text-gray-900 uppercase tracking-widest mb-3 border-b border-gray-200 pb-1">Experience</h2>
             {experience.map((exp, idx) => (
               <div key={idx} className="mb-4">
                 <div className="flex justify-between flex-wrap gap-1">
-                  {/* ✅ `role` not `title` */}
                   <h3 className="font-semibold text-gray-900 text-sm">{exp.role || exp.title}</h3>
-                  <span className="text-xs text-gray-500">
-                    {formatDate(exp.startDate)} — {exp.currentlyWorking ? "Present" : formatDate(exp.endDate)}
-                  </span>
+                  <span className="text-xs text-gray-500">{formatDate(exp.startDate)} — {exp.currentlyWorking ? "Present" : formatDate(exp.endDate)}</span>
                 </div>
                 <p className="text-gray-600 text-sm">{exp.company}{exp.location ? `, ${exp.location}` : ""}</p>
                 {exp.description && <p className="text-gray-700 text-sm mt-1">{exp.description}</p>}
@@ -417,8 +328,7 @@ export default function ResumePreview() {
                   <ul className="mt-1 space-y-0.5">
                     {exp.achievements.map((a, i) => (
                       <li key={i} className="text-xs text-gray-600 flex items-start gap-1.5">
-                        <span className="mt-1.5 w-1 h-1 rounded-full bg-gray-400 flex-shrink-0" />
-                        {a}
+                        <span className="mt-1.5 w-1 h-1 rounded-full bg-gray-400 flex-shrink-0" />{a}
                       </li>
                     ))}
                   </ul>
@@ -427,8 +337,6 @@ export default function ResumePreview() {
             ))}
           </div>
         )}
-
-        {/* Education */}
         {education.length > 0 && (
           <div className="mb-5">
             <h2 className="text-sm font-bold text-gray-900 uppercase tracking-widest mb-3 border-b border-gray-200 pb-1">Education</h2>
@@ -438,46 +346,217 @@ export default function ResumePreview() {
                   <h3 className="font-semibold text-gray-900 text-sm">{edu.degree}</h3>
                   <p className="text-gray-600 text-xs">{edu.institution}</p>
                 </div>
-                <span className="text-xs text-gray-500">
-                  {formatDate(edu.startDate)} — {edu.currentlyStudying ? "Present" : formatDate(edu.endDate)}
-                </span>
+                <span className="text-xs text-gray-500">{formatDate(edu.startDate)} — {edu.currentlyStudying ? "Present" : formatDate(edu.endDate)}</span>
               </div>
             ))}
           </div>
         )}
-
-        {/* Projects */}
         {projects.length > 0 && (
           <div className="mb-5">
             <h2 className="text-sm font-bold text-gray-900 uppercase tracking-widest mb-3 border-b border-gray-200 pb-1">Projects</h2>
-            {projects.map((project, idx) => (
+            {projects.map((pr, idx) => (
               <div key={idx} className="mb-3">
                 <div className="flex items-center gap-2">
-                  {/* ✅ `title` not `name` */}
-                  <h3 className="font-semibold text-gray-900 text-sm">{project.title || project.name}</h3>
-                  {project.liveLink && (
-                    <a href={project.liveLink} target="_blank" rel="noreferrer" className="text-blue-600 text-xs hover:underline">Live ↗</a>
-                  )}
+                  <h3 className="font-semibold text-gray-900 text-sm">{pr.title || pr.name}</h3>
+                  {pr.liveLink && <a href={pr.liveLink} target="_blank" rel="noreferrer" className="text-blue-600 text-xs hover:underline">Live ↗</a>}
                 </div>
-                {project.description && <p className="text-gray-700 text-xs mt-0.5">{project.description}</p>}
-                {project.technologies?.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">{project.technologies.join(" · ")}</p>
-                )}
+                {pr.description && <p className="text-gray-700 text-xs mt-0.5">{pr.description}</p>}
+                {pr.technologies?.length > 0 && <p className="text-xs text-gray-500 mt-1">{pr.technologies.join(" · ")}</p>}
               </div>
             ))}
           </div>
         )}
-
-        {/* Skills */}
         {skills.length > 0 && (
           <div className="mb-5">
             <h2 className="text-sm font-bold text-gray-900 uppercase tracking-widest mb-2 border-b border-gray-200 pb-1">Skills</h2>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {skills.map((skill, idx) => (
-                <span key={idx} className="text-sm text-gray-700 flex items-center gap-1">
-                  <span className="w-1 h-1 rounded-full bg-gray-400 inline-block" />
-                  {skillName(skill)}
+              {skills.map((sk, i) => (
+                <span key={i} className="text-sm text-gray-700 flex items-center gap-1">
+                  <span className="w-1 h-1 rounded-full bg-gray-400 inline-block" />{skillName(sk)}
                 </span>
+              ))}
+            </div>
+          </div>
+        )}
+        {certifications.length > 0 && (
+          <div className="mb-5">
+            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-widest mb-2 border-b border-gray-200 pb-1">Certifications</h2>
+            {certifications.map((c, i) => (
+              <div key={i} className="flex justify-between flex-wrap gap-1 mb-1">
+                <div><p className="font-medium text-gray-900 text-sm">{c.name}</p><p className="text-xs text-gray-600">{c.issuer}</p></div>
+                <span className="text-xs text-gray-500">{formatDate(c.issueDate)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {languages.length > 0 && (
+          <div>
+            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-widest mb-2 border-b border-gray-200 pb-1">Languages</h2>
+            <div className="flex flex-wrap gap-3">
+              {languages.map((l, i) => <span key={i} className="text-sm text-gray-700">{l.name}{l.proficiency ? ` (${l.proficiency})` : ""}</span>)}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 3. MINIMAL — generous whitespace, teal accents
+  // ══════════════════════════════════════════════════════════════════════
+  const renderMinimal = () => (
+    <div className="bg-white rounded-xl shadow-lg overflow-hidden print:shadow-none print:rounded-none">
+      <div className="p-10">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-4xl font-light text-gray-900 tracking-tight mb-1">{p.name || "Your Name"}</h1>
+          {p.title && <p className="text-lg text-teal-600 font-medium mb-4">{p.title}</p>}
+          <div className="flex flex-wrap gap-5 text-sm text-gray-400">
+            {p.email    && <a href={`mailto:${p.email}`} className="hover:text-teal-600 transition-colors flex items-center gap-1"><Mail className="w-3.5 h-3.5" />{p.email}</a>}
+            {p.phone    && <span className="flex items-center gap-1"><Phone className="w-3.5 h-3.5" />{p.phone}</span>}
+            {p.location && <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{p.location}</span>}
+            {p.linkedin && <a href={p.linkedin} target="_blank" rel="noreferrer" className="hover:text-teal-600 flex items-center gap-1"><Linkedin className="w-3.5 h-3.5" />LinkedIn</a>}
+            {p.github   && <a href={p.github}   target="_blank" rel="noreferrer" className="hover:text-teal-600 flex items-center gap-1"><Github   className="w-3.5 h-3.5" />GitHub</a>}
+          </div>
+        </div>
+
+        {summary && (
+          <div className="mb-8 pb-8 border-b border-gray-100">
+            <p className="text-gray-600 leading-relaxed text-base">{summary}</p>
+          </div>
+        )}
+
+        {experience.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xs font-semibold text-teal-600 uppercase tracking-[0.15em] mb-5">Experience</h2>
+            <div className="space-y-6">
+              {experience.map((exp, idx) => (
+                <div key={idx} className="grid grid-cols-[1fr_auto] gap-4">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{exp.role || exp.title}</h3>
+                    <p className="text-gray-500 text-sm mt-0.5">{exp.company}{exp.location ? ` · ${exp.location}` : ""}</p>
+                    {exp.description && <p className="text-gray-600 text-sm mt-2 leading-relaxed">{exp.description}</p>}
+                    {exp.technologies?.length > 0 && (
+                      <p className="text-xs text-gray-400 mt-2">{exp.technologies.join(" · ")}</p>
+                    )}
+                  </div>
+                  <span className="text-xs text-gray-400 whitespace-nowrap pt-0.5">
+                    {formatDate(exp.startDate)} — {exp.currentlyWorking ? "Present" : formatDate(exp.endDate)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {education.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xs font-semibold text-teal-600 uppercase tracking-[0.15em] mb-5">Education</h2>
+            <div className="space-y-4">
+              {education.map((edu, idx) => (
+                <div key={idx} className="grid grid-cols-[1fr_auto] gap-4">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{edu.degree}</h3>
+                    <p className="text-gray-500 text-sm">{edu.institution}</p>
+                  </div>
+                  <span className="text-xs text-gray-400 whitespace-nowrap pt-0.5">
+                    {formatDate(edu.startDate)} — {edu.currentlyStudying ? "Present" : formatDate(edu.endDate)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {skills.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xs font-semibold text-teal-600 uppercase tracking-[0.15em] mb-4">Skills</h2>
+            <div className="flex flex-wrap gap-2">
+              {skills.map((sk, i) => (
+                <span key={i} className="px-3 py-1 border border-teal-200 text-teal-700 rounded-full text-sm">{skillName(sk)}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {projects.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xs font-semibold text-teal-600 uppercase tracking-[0.15em] mb-5">Projects</h2>
+            <div className="space-y-4">
+              {projects.map((pr, idx) => (
+                <div key={idx}>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-gray-900">{pr.title || pr.name}</h3>
+                    {pr.liveLink   && <a href={pr.liveLink}   target="_blank" rel="noreferrer" className="text-teal-600 text-xs hover:underline flex items-center gap-1"><ExternalLink className="w-3 h-3" />Live</a>}
+                    {pr.githubLink && <a href={pr.githubLink} target="_blank" rel="noreferrer" className="text-gray-400 text-xs hover:underline flex items-center gap-1"><Github className="w-3 h-3" />Code</a>}
+                  </div>
+                  {pr.description && <p className="text-gray-600 text-sm mt-1">{pr.description}</p>}
+                  {pr.technologies?.length > 0 && <p className="text-xs text-gray-400 mt-1">{pr.technologies.join(" · ")}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {languages.length > 0 && (
+          <div>
+            <h2 className="text-xs font-semibold text-teal-600 uppercase tracking-[0.15em] mb-3">Languages</h2>
+            <div className="flex flex-wrap gap-3">
+              {languages.map((l, i) => (
+                <span key={i} className="text-sm text-gray-600">{l.name}{l.proficiency ? ` · ${l.proficiency}` : ""}</span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 4. CREATIVE — bold purple/fuchsia sidebar
+  // ══════════════════════════════════════════════════════════════════════
+  const renderCreative = () => (
+    <div className="bg-white rounded-xl shadow-lg overflow-hidden print:shadow-none print:rounded-none flex min-h-[800px]">
+      {/* Sidebar */}
+      <div className="w-72 flex-shrink-0 text-white p-7 flex flex-col gap-6"
+        style={{ background: "linear-gradient(160deg, #581c87, #a21caf)" }}>
+        <div>
+          <h1 className="text-2xl font-bold leading-tight mb-1">{p.name || "Your Name"}</h1>
+          {p.title && <p className="text-purple-200 text-sm font-medium">{p.title}</p>}
+        </div>
+
+        {/* Contact */}
+        <div className="space-y-2">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-purple-300 mb-2">Contact</h2>
+          {p.email    && <a href={`mailto:${p.email}`} className="flex items-center gap-2 text-xs text-purple-100 hover:text-white break-all"><Mail    className="w-3.5 h-3.5 flex-shrink-0" />{p.email}</a>}
+          {p.phone    && <span className="flex items-center gap-2 text-xs text-purple-100"><Phone   className="w-3.5 h-3.5 flex-shrink-0" />{p.phone}</span>}
+          {p.location && <span className="flex items-center gap-2 text-xs text-purple-100"><MapPin  className="w-3.5 h-3.5 flex-shrink-0" />{p.location}</span>}
+          {p.linkedin && <a href={p.linkedin} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs text-purple-100 hover:text-white"><Linkedin className="w-3.5 h-3.5 flex-shrink-0" />LinkedIn</a>}
+          {p.github   && <a href={p.github}   target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs text-purple-100 hover:text-white"><Github   className="w-3.5 h-3.5 flex-shrink-0" />GitHub</a>}
+          {p.portfolio && <a href={p.portfolio} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs text-purple-100 hover:text-white"><Globe   className="w-3.5 h-3.5 flex-shrink-0" />Portfolio</a>}
+        </div>
+
+        {/* Skills */}
+        {skills.length > 0 && (
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-purple-300 mb-3">Skills</h2>
+            <div className="flex flex-wrap gap-1.5">
+              {skills.map((sk, i) => (
+                <span key={i} className="px-2 py-1 bg-white/15 text-white rounded text-xs">{skillName(sk)}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Languages */}
+        {languages.length > 0 && (
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-purple-300 mb-3">Languages</h2>
+            <div className="space-y-1">
+              {languages.map((l, i) => (
+                <div key={i} className="text-xs text-purple-100">
+                  {l.name}{l.proficiency ? <span className="text-purple-300"> · {l.proficiency}</span> : ""}
+                </div>
               ))}
             </div>
           </div>
@@ -485,42 +564,238 @@ export default function ResumePreview() {
 
         {/* Certifications */}
         {certifications.length > 0 && (
-          <div className="mb-5">
-            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-widest mb-2 border-b border-gray-200 pb-1">Certifications</h2>
-            {certifications.map((cert, idx) => (
-              <div key={idx} className="flex justify-between flex-wrap gap-1 mb-1">
-                <div>
-                  <p className="font-medium text-gray-900 text-sm">{cert.name}</p>
-                  <p className="text-xs text-gray-600">{cert.issuer}</p>
-                </div>
-                <span className="text-xs text-gray-500">{formatDate(cert.issueDate)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Languages */}
-        {languages.length > 0 && (
           <div>
-            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-widest mb-2 border-b border-gray-200 pb-1">Languages</h2>
-            <div className="flex flex-wrap gap-3">
-              {languages.map((lang, idx) => (
-                <span key={idx} className="text-sm text-gray-700">
-                  {lang.name}{lang.proficiency ? ` (${lang.proficiency})` : ""}
-                </span>
+            <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-purple-300 mb-3">Certifications</h2>
+            <div className="space-y-2">
+              {certifications.map((c, i) => (
+                <div key={i}>
+                  <p className="text-xs text-white font-medium">{c.name}</p>
+                  <p className="text-xs text-purple-300">{c.issuer}</p>
+                </div>
               ))}
             </div>
           </div>
         )}
+      </div>
 
+      {/* Main */}
+      <div className="flex-1 p-8 space-y-6 overflow-auto">
+        {summary && (
+          <section>
+            <h2 className="text-sm font-bold text-fuchsia-700 uppercase tracking-widest mb-2 border-b-2 border-fuchsia-100 pb-1">About Me</h2>
+            <p className="text-gray-700 text-sm leading-relaxed">{summary}</p>
+          </section>
+        )}
+        {experience.length > 0 && (
+          <section>
+            <h2 className="text-sm font-bold text-fuchsia-700 uppercase tracking-widest mb-3 border-b-2 border-fuchsia-100 pb-1">Experience</h2>
+            <div className="space-y-5">
+              <ExperienceItems accentClass="border-fuchsia-500" tagClass="bg-fuchsia-50 text-fuchsia-700" />
+            </div>
+          </section>
+        )}
+        {education.length > 0 && (
+          <section>
+            <h2 className="text-sm font-bold text-fuchsia-700 uppercase tracking-widest mb-3 border-b-2 border-fuchsia-100 pb-1">Education</h2>
+            <div className="space-y-3">
+              {education.map((edu, idx) => (
+                <div key={idx} className="flex justify-between flex-wrap gap-2">
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-sm">{edu.degree}</h3>
+                    <p className="text-gray-500 text-xs">{edu.institution}{edu.location ? ` · ${edu.location}` : ""}</p>
+                  </div>
+                  <span className="text-xs text-gray-400">{formatDate(edu.startDate)} — {edu.currentlyStudying ? "Present" : formatDate(edu.endDate)}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+        {projects.length > 0 && (
+          <section>
+            <h2 className="text-sm font-bold text-fuchsia-700 uppercase tracking-widest mb-3 border-b-2 border-fuchsia-100 pb-1">Projects</h2>
+            <div className="space-y-4">
+              {projects.map((pr, idx) => (
+                <div key={idx}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-semibold text-gray-900 text-sm">{pr.title || pr.name}</h3>
+                    {pr.liveLink   && <a href={pr.liveLink}   target="_blank" rel="noreferrer" className="text-fuchsia-600 text-xs hover:underline flex items-center gap-1"><ExternalLink className="w-3 h-3" />Live</a>}
+                    {pr.githubLink && <a href={pr.githubLink} target="_blank" rel="noreferrer" className="text-gray-500 text-xs hover:underline flex items-center gap-1"><Github className="w-3 h-3" />Code</a>}
+                  </div>
+                  {pr.description && <p className="text-gray-600 text-xs mt-1">{pr.description}</p>}
+                  {pr.technologies?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {pr.technologies.map((t, i) => <span key={i} className="text-xs bg-fuchsia-50 text-fuchsia-700 px-2 py-0.5 rounded">{t}</span>)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );
 
-  // ── Page render ───────────────────────────────────────────────────────
+  // ══════════════════════════════════════════════════════════════════════
+  // 5. TECH — dark header, monospace details, cyan accents
+  // ══════════════════════════════════════════════════════════════════════
+  const renderTech = () => (
+    <div className="bg-white rounded-xl shadow-lg overflow-hidden print:shadow-none print:rounded-none">
+      {/* Dark header */}
+      <div className="px-8 py-8" style={{ background: "#0c1220" }}>
+        <h1 className="text-3xl font-bold text-white mb-1">{p.name || "Your Name"}</h1>
+        {p.title && <p className="text-cyan-400 text-base font-mono mb-4">{p.title}</p>}
+        <div className="flex flex-wrap gap-4 text-xs font-mono text-slate-400">
+          {p.email    && <a href={`mailto:${p.email}`} className="flex items-center gap-1.5 hover:text-cyan-400 transition-colors"><Mail    className="w-3.5 h-3.5" />{p.email}</a>}
+          {p.phone    && <span className="flex items-center gap-1.5"><Phone   className="w-3.5 h-3.5" />{p.phone}</span>}
+          {p.location && <span className="flex items-center gap-1.5"><MapPin  className="w-3.5 h-3.5" />{p.location}</span>}
+          {p.linkedin && <a href={p.linkedin} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 hover:text-cyan-400 transition-colors"><Linkedin className="w-3.5 h-3.5" />LinkedIn</a>}
+          {p.github   && <a href={p.github}   target="_blank" rel="noreferrer" className="flex items-center gap-1.5 hover:text-cyan-400 transition-colors"><Github   className="w-3.5 h-3.5" />GitHub</a>}
+          {p.portfolio && <a href={p.portfolio} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 hover:text-cyan-400 transition-colors"><Globe   className="w-3.5 h-3.5" />Portfolio</a>}
+        </div>
+      </div>
+
+      <div className="p-8 space-y-7">
+        {summary && (
+          <section>
+            <h2 className="text-xs font-mono font-bold text-cyan-600 uppercase tracking-[0.15em] mb-3 flex items-center gap-2">
+              <span className="text-slate-300">{"// "}</span>about
+            </h2>
+            <p className="text-gray-700 text-sm leading-relaxed">{summary}</p>
+          </section>
+        )}
+
+        {skills.length > 0 && (
+          <section>
+            <h2 className="text-xs font-mono font-bold text-cyan-600 uppercase tracking-[0.15em] mb-3 flex items-center gap-2">
+              <span className="text-slate-300">{"// "}</span>tech_stack
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {skills.map((sk, i) => (
+                <span key={i} className="px-3 py-1 rounded text-xs font-mono font-medium"
+                  style={{ background: "#0e2030", color: "#22d3ee", border: "1px solid #164e63" }}>
+                  {skillName(sk)}
+                </span>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {experience.length > 0 && (
+          <section>
+            <h2 className="text-xs font-mono font-bold text-cyan-600 uppercase tracking-[0.15em] mb-4 flex items-center gap-2">
+              <span className="text-slate-300">{"// "}</span>experience
+            </h2>
+            <div className="space-y-5">
+              {experience.map((exp, idx) => (
+                <div key={idx} className="border-l-2 border-cyan-500/40 pl-4">
+                  <div className="flex justify-between items-start flex-wrap gap-2">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{exp.role || exp.title}</h3>
+                      <p className="text-sm text-gray-500 font-mono">{exp.company}{exp.location ? ` · ${exp.location}` : ""}</p>
+                    </div>
+                    <span className="text-xs font-mono text-gray-400 flex-shrink-0">
+                      {formatDate(exp.startDate)} → {exp.currentlyWorking ? "now" : formatDate(exp.endDate)}
+                    </span>
+                  </div>
+                  {exp.description && <p className="text-gray-700 mt-2 text-sm">{exp.description}</p>}
+                  {exp.achievements?.length > 0 && (
+                    <ul className="mt-2 space-y-1">
+                      {exp.achievements.map((a, i) => (
+                        <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
+                          <span className="text-cyan-500 font-mono flex-shrink-0">›</span>{a}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {exp.technologies?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {exp.technologies.map((t, i) => (
+                        <span key={i} className="text-xs font-mono px-2 py-0.5 rounded"
+                          style={{ background: "#f0fdf4", color: "#166534" }}>{t}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {projects.length > 0 && (
+          <section>
+            <h2 className="text-xs font-mono font-bold text-cyan-600 uppercase tracking-[0.15em] mb-4 flex items-center gap-2">
+              <span className="text-slate-300">{"// "}</span>projects
+            </h2>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {projects.map((pr, idx) => (
+                <div key={idx} className="p-4 rounded-lg border border-slate-100" style={{ background: "#f8fafc" }}>
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <h3 className="font-semibold text-gray-900 text-sm">{pr.title || pr.name}</h3>
+                    {pr.liveLink   && <a href={pr.liveLink}   target="_blank" rel="noreferrer" className="text-cyan-600 text-xs hover:underline flex items-center gap-1"><ExternalLink className="w-3 h-3" />Live</a>}
+                    {pr.githubLink && <a href={pr.githubLink} target="_blank" rel="noreferrer" className="text-gray-500 text-xs hover:underline flex items-center gap-1"><Github className="w-3 h-3" />Code</a>}
+                  </div>
+                  {pr.description && <p className="text-gray-600 text-xs mb-2">{pr.description}</p>}
+                  {pr.technologies?.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {pr.technologies.map((t, i) => <span key={i} className="text-xs font-mono bg-cyan-50 text-cyan-700 px-1.5 py-0.5 rounded">{t}</span>)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {education.length > 0 && (
+          <section>
+            <h2 className="text-xs font-mono font-bold text-cyan-600 uppercase tracking-[0.15em] mb-3 flex items-center gap-2">
+              <span className="text-slate-300">{"// "}</span>education
+            </h2>
+            <div className="space-y-3">
+              {education.map((edu, idx) => (
+                <div key={idx} className="flex justify-between flex-wrap gap-2">
+                  <div>
+                    <h3 className="font-semibold text-gray-900 text-sm">{edu.degree}</h3>
+                    <p className="text-gray-500 text-xs font-mono">{edu.institution}</p>
+                  </div>
+                  <span className="text-xs font-mono text-gray-400">{formatDate(edu.startDate)} → {edu.currentlyStudying ? "now" : formatDate(edu.endDate)}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {languages.length > 0 && (
+          <section>
+            <h2 className="text-xs font-mono font-bold text-cyan-600 uppercase tracking-[0.15em] mb-3 flex items-center gap-2">
+              <span className="text-slate-300">{"// "}</span>languages
+            </h2>
+            <div className="flex flex-wrap gap-3">
+              {languages.map((l, i) => (
+                <span key={i} className="text-sm text-gray-600 font-mono">{l.name}{l.proficiency ? ` [${l.proficiency}]` : ""}</span>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
+  );
+
+  // ── Router ────────────────────────────────────────────────────────────
+  const renderTemplate = () => {
+    switch (activeTemplate) {
+      case "classic":  return renderClassic();
+      case "minimal":  return renderMinimal();
+      case "creative": return renderCreative();
+      case "tech":     return renderTech();
+      default:         return renderModern();
+    }
+  };
+
+  // ── Page ──────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-100">
-
       {/* Toolbar */}
       <div className="sticky top-0 z-10 bg-white border-b shadow-sm print:hidden">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between flex-wrap gap-2">
@@ -533,44 +808,30 @@ export default function ResumePreview() {
           </button>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={handleEdit}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Edit2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Edit</span>
+            <button onClick={handleEdit}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+              <Edit2 className="w-4 h-4" /><span className="hidden sm:inline">Edit</span>
             </button>
-            <button
-              onClick={handleDownload}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              <span className="hidden sm:inline">Download PDF</span>
+            <button onClick={handleDownload}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors">
+              <Download className="w-4 h-4" /><span className="hidden sm:inline">Download PDF</span>
             </button>
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors"
-            >
-              <Printer className="w-4 h-4" />
-              <span className="hidden sm:inline">Print</span>
+            <button onClick={handlePrint}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors">
+              <Printer className="w-4 h-4" /><span className="hidden sm:inline">Print</span>
             </button>
-            <button
-              onClick={handleShare}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors"
-            >
-              <Share2 className="w-4 h-4" />
-              <span className="hidden sm:inline">{copied ? "Copied!" : "Share"}</span>
+            <button onClick={handleShare}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors">
+              <Share2 className="w-4 h-4" /><span className="hidden sm:inline">{copied ? "Copied!" : "Share"}</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Content */}
       <div className="max-w-4xl mx-auto px-4 py-8">
-
-        {/* Template switcher */}
-        <div className="mb-4 flex justify-end gap-2 print:hidden">
-          {["modern", "classic"].map((tpl) => (
+        {/* Template switcher — all 5 templates */}
+        <div className="mb-4 flex flex-wrap justify-end gap-2 print:hidden">
+          {ALL_TEMPLATES.map((tpl) => (
             <button
               key={tpl}
               onClick={() => setActiveTemplate(tpl)}
@@ -580,13 +841,13 @@ export default function ResumePreview() {
                   : "bg-white text-gray-700 hover:bg-gray-100"
               }`}
             >
-              {tpl} Template
+              {tpl}
             </button>
           ))}
         </div>
 
         {/* Resume */}
-        {activeTemplate === "modern" ? renderModernTemplate() : renderClassicTemplate()}
+        {renderTemplate()}
 
         {/* ATS Score strip */}
         <div className="mt-6 bg-white rounded-xl p-5 shadow-sm border print:hidden">
@@ -606,9 +867,7 @@ export default function ResumePreview() {
               </div>
               <span className={`font-bold text-lg ${
                 atsScore >= 85 ? "text-emerald-600" : atsScore >= 70 ? "text-blue-600" : "text-amber-600"
-              }`}>
-                {atsScore}%
-              </span>
+              }`}>{atsScore}%</span>
             </div>
           </div>
           <p className="text-sm text-gray-500 mt-2">
@@ -619,10 +878,8 @@ export default function ResumePreview() {
               : "Add more relevant keywords and structure to improve ATS compatibility."}
           </p>
         </div>
-
       </div>
 
-      {/* Print styles */}
       <style>{`
         @media print {
           .print\\:hidden { display: none !important; }

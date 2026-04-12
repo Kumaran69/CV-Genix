@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useCallback } from "react";
+import { useState, useEffect, useContext, useCallback, useRef } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import ResumeForm from "../components/ResumeForm.jsx";
 import ResumePreview from "../components/ResumePreview.jsx";
@@ -35,16 +35,15 @@ const DEFAULT_RESUME = {
   hobbies: [], references: [], template: "classic",
 };
 
-// ─────────────────────────────────────────────
-// ✅ FIXED: SECTIONS was commented out but used everywhere — restored
-// ─────────────────────────────────────────────
 const SECTIONS = [
-  { key: "personal",       label: "Personal",       icon: "👤" },
-  { key: "experience",     label: "Experience",     icon: "💼" },
-  { key: "education",      label: "Education",      icon: "🎓" },
-  { key: "skills",         label: "Skills",         icon: "⚡" },
-  { key: "projects",       label: "Projects",       icon: "🚀" },
+  { key: "personal",   label: "Personal",   icon: "👤" },
+  { key: "experience", label: "Experience", icon: "💼" },
+  { key: "education",  label: "Education",  icon: "🎓" },
+  { key: "skills",     label: "Skills",     icon: "⚡" },
+  { key: "projects",   label: "Projects",   icon: "🚀" },
 ];
+
+const STORAGE_KEY = "resumeSelectedTemplate";
 
 // ─────────────────────────────────────────────
 // Completion calculator
@@ -57,31 +56,22 @@ function calcCompletion(data) {
   if (p.email)   score += 10;
   if (p.phone)   score += 5;
   if (p.summary) score += 10;
-  if (data.experience?.length > 0)    score += 25;
-  if (data.education?.length > 0)     score += 15;
-  if (data.skills?.length > 0)        score += 10;
+  if (data.experience?.length > 0) score += 25;
+  if (data.education?.length > 0)  score += 15;
+  if (data.skills?.length > 0)     score += 10;
   return Math.min(score, 100);
 }
 
-// ─────────────────────────────────────────────
-// Check if a section is filled
-// ─────────────────────────────────────────────
 function isSectionFilled(key, data) {
   if (key === "personal") return !!(data.personal?.name && data.personal?.email);
   return Array.isArray(data[key]) && data[key].length > 0;
 }
 
-// ─────────────────────────────────────────────
-// Find first incomplete section index
-// ─────────────────────────────────────────────
 function findFirstIncompleteSection(data) {
   const idx = SECTIONS.findIndex((s) => !isSectionFilled(s.key, data));
   return idx === -1 ? SECTIONS.length - 1 : idx;
 }
 
-// ─────────────────────────────────────────────
-// Merge fetched resume onto default shape
-// ─────────────────────────────────────────────
 function mergeResume(raw) {
   return {
     personal: {
@@ -111,9 +101,6 @@ function mergeResume(raw) {
   };
 }
 
-// ─────────────────────────────────────────────
-// Format before API save
-// ─────────────────────────────────────────────
 function formatDataForSave(data) {
   const p = data.personal || {};
 
@@ -273,7 +260,7 @@ function SectionPill({ label, icon, filled, active, onClick }) {
 export default function ResumeBuilder() {
   const navigate  = useNavigate();
   const location  = useLocation();
-  const { id }    = useParams();           // /builder/:id  when editing
+  const { id }    = useParams();
   const { token } = useContext(AuthContext);
 
   const isEditing = Boolean(id);
@@ -289,41 +276,110 @@ export default function ResumeBuilder() {
   const [lastSaved,       setLastSaved]       = useState(null);
   const [activeSection,   setActiveSection]   = useState("personal");
 
+  // Track whether we've already handled the initial location state so we don't
+  // re-apply it on unrelated re-renders.
+  const handledStateRef = useRef(false);
+
   const completion = calcCompletion(resumeData);
 
-  // ── Fetch existing resume by ID from URL ──────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // EFFECT 1: Apply template / resume data coming back from TemplateSelection.
+  // Runs whenever location.state changes (i.e. every navigation).
+  // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (id) {
-      const load = async () => {
-        try {
-          setIsFetching(true);
-          const res  = await getResumeById(id);
-          const raw  = res.data?.resume || res.data;
-          const data = mergeResume(raw);
-          setResumeData(data);
-          setResumeId(id);
+    const state = location.state;
+    if (!state || handledStateRef.current) return;
 
-          // Jump to first incomplete section automatically
-          const firstIncomplete = findFirstIncompleteSection(data);
-          setActiveSection(SECTIONS[firstIncomplete].key);
-        } catch (err) {
-          console.error("Failed to load resume:", err.message);
-          setSaveError("Could not load resume. Please go back and try again.");
-        } finally {
-          setIsFetching(false);
-        }
-      };
-      load();
-    } else if (location.state?.resume) {
-      const data = mergeResume(location.state.resume);
-      setResumeData(data);
-      setResumeId(location.state.resume._id || location.state.resume.id || null);
-      const firstIncomplete = findFirstIncompleteSection(data);
-      setActiveSection(SECTIONS[firstIncomplete].key);
+    // Resolve template: prefer explicit key, then baked into resume object,
+    // then sessionStorage fallback (set by TemplateSelection as a safety net).
+    const incomingTemplate =
+      state.selectedTemplate ||
+      state.resume?.template ||
+      sessionStorage.getItem(STORAGE_KEY) ||
+      null;
+
+    // Clean up sessionStorage regardless
+    sessionStorage.removeItem(STORAGE_KEY);
+
+    const hasFullResume  = Boolean(state.resume);
+    const hasTemplate    = Boolean(incomingTemplate);
+    const isTemplateOnly = state.templateApplied === true; // flag set by TemplateSelection
+
+    if (isTemplateOnly && hasTemplate) {
+      // ── Returning from template picker: only update the template field ──
+      setResumeData((prev) => ({ ...prev, template: incomingTemplate }));
+      handledStateRef.current = true;
+
+      // Replace history entry so refreshing doesn't re-apply the state
+      navigate(location.pathname, { replace: true, state: null });
+      return;
     }
+
+    if (hasFullResume && !id) {
+      // ── Fresh builder opened with a pre-filled resume object ──
+      const merged = mergeResume({
+        ...state.resume,
+        // Ensure the resolved template wins even if it's on a separate key
+        template: incomingTemplate || state.resume.template || "classic",
+      });
+      setResumeData(merged);
+      setResumeId(merged._id || merged.id || null);
+      setActiveSection(SECTIONS[findFirstIncompleteSection(merged)].key);
+      handledStateRef.current = true;
+
+      navigate(location.pathname, { replace: true, state: null });
+      return;
+    }
+
+    // If there's only a template with no full resume object (edge-case)
+    if (hasTemplate && !hasFullResume) {
+      setResumeData((prev) => ({ ...prev, template: incomingTemplate }));
+      handledStateRef.current = true;
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location.state]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset the guard whenever the user navigates away and comes back fresh
+  useEffect(() => {
+    handledStateRef.current = false;
+  }, [location.key]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // EFFECT 2: Load an existing resume by ID (edit mode)
+  // ─────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!id) return;
+    const load = async () => {
+      try {
+        setIsFetching(true);
+        const res  = await getResumeById(id);
+        const raw  = res.data?.resume || res.data;
+        const data = mergeResume(raw);
+
+        // If we're returning from template selection, the template in
+        // location.state takes priority over what's stored in the DB.
+        const pendingTemplate = sessionStorage.getItem(STORAGE_KEY);
+        if (pendingTemplate) {
+          data.template = pendingTemplate;
+          sessionStorage.removeItem(STORAGE_KEY);
+        }
+
+        setResumeData(data);
+        setResumeId(id);
+        setActiveSection(SECTIONS[findFirstIncompleteSection(data)].key);
+      } catch (err) {
+        console.error("Failed to load resume:", err.message);
+        setSaveError("Could not load resume. Please go back and try again.");
+      } finally {
+        setIsFetching(false);
+      }
+    };
+    load();
   }, [id]);
 
-  // ── Undo-aware updater ─────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // Undo-aware updater
+  // ─────────────────────────────────────────────────────────────────────────
   const updateResumeData = useCallback((updater) => {
     setResumeData((prev) => {
       setHistory((h) => [prev, ...h.slice(0, 19)]);
@@ -349,7 +405,9 @@ export default function ResumeBuilder() {
     return () => window.removeEventListener("keydown", handler);
   }, [handleUndo]);
 
-  // ── Save / Update ──────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // Save / Update
+  // ─────────────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     setSaveError("");
     setIsSaving(true);
@@ -357,18 +415,15 @@ export default function ResumeBuilder() {
       const formatted = formatDataForSave(resumeData);
 
       if (resumeId) {
-        // Editing existing resume — PUT /resumes/:id
         const res = await updateResume(resumeId, formatted);
         const updatedId = res.data?.resume?.id || res.data?.resume?._id || resumeId;
         setResumeId(updatedId);
       } else {
-        // New resume — use createResume instead of API.post directly
         if (!formatted.title || formatted.title === "My Resume") {
           formatted.title = `Resume - ${new Date().toLocaleDateString("en-GB", {
             day: "2-digit", month: "short", year: "numeric",
           })}`;
         }
-        // ✅ FIXED: Use createResume instead of API.post
         const res = await createResume(formatted);
         const newId = res.data?.resume?.id || res.data?.resume?._id || res.data?._id;
         if (newId) setResumeId(newId);
@@ -389,9 +444,22 @@ export default function ResumeBuilder() {
     }
   };
 
-  const goToTemplates = () => navigate("/template-selection", { state: { resumeData } });
+  // ─────────────────────────────────────────────────────────────────────────
+  // Navigate to template picker — passes current resumeData so the picker
+  // can pre-select the active template and return the full object back.
+  // ─────────────────────────────────────────────────────────────────────────
+  const goToTemplates = () => {
+    navigate("/template-selection", {
+      state: {
+        resumeData,                              // full resume so picker can return it
+        from: id ? `/builder/${id}` : "/builder", // correct return path
+      },
+    });
+  };
 
-  // ── Loading state while fetching ──────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // Loading state
+  // ─────────────────────────────────────────────────────────────────────────
   if (isFetching) {
     return (
       <div className="min-h-screen flex items-center justify-center"
@@ -523,7 +591,6 @@ export default function ResumeBuilder() {
               ))}
             </div>
 
-            {/* "Continue from" hint when editing */}
             {isEditing && (
               <p className="text-xs mt-2" style={{ color:"#4a6080" }}>
                 {isSectionFilled("personal", resumeData) &&
@@ -605,6 +672,7 @@ export default function ResumeBuilder() {
                         <p className="text-xs" style={{ color:"#4a6080" }}>Updates as you type</p>
                       </div>
                     </div>
+                    {/* ── Template badge: shows currently active template ── */}
                     <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium"
                       style={{ background:"rgba(59,130,246,0.12)",border:"1px solid rgba(59,130,246,0.28)",color:"#93c5fd" }}>
                       <Sparkles className="w-3 h-3" />
@@ -614,6 +682,7 @@ export default function ResumeBuilder() {
 
                   <div className="rb-scroll overflow-y-auto" style={{ maxHeight:"65vh" }}>
                     <div className="p-6">
+                      {/* ResumePreview receives the full resumeData including template */}
                       <ResumePreview resume={resumeData} />
                     </div>
                   </div>
