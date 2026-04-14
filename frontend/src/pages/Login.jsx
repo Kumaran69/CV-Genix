@@ -49,93 +49,89 @@ export default function Login() {
     onError: () => alert("Google login failed"),
   });
 
+  const inputStyle = (field, extra = {}) => ({
+    width: "100%",
+    padding: "13px 16px 13px 44px",
+    background: focusedField === field ? "rgba(99,102,241,0.1)" : "rgba(255,255,255,0.05)",
+    border: `1.5px solid ${focusedField === field ? "rgba(129,140,248,0.7)" : "rgba(148,163,184,0.2)"}`,
+    borderRadius: 14,
+    color: "#f1f5f9",
+    fontSize: 14,
+    outline: "none",
+    caretColor: "#818cf8",
+    boxShadow: focusedField === field ? "0 0 0 3px rgba(99,102,241,0.15)" : "none",
+    transition: "all 0.2s",
+    fontFamily: "inherit",
+    ...extra,
+  });
+
+  const iconStyle = (field) => ({
+    position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)",
+    pointerEvents: "none", display: "flex",
+    color: focusedField === field ? "#a5b4fc" : "rgba(148,163,184,0.5)",
+    transition: "color 0.2s",
+  });
+
   return (
     <div
       className="relative min-h-screen flex items-center justify-center p-6 overflow-hidden"
-      style={{ background: "#03060f" }}
+      style={{ background: "linear-gradient(135deg, #020817 0%, #0a0f2e 50%, #020817 100%)" }}
     >
-      {/* ── Aurora blobs (uses tailwind animate-blob from your config) ── */}
+      {/* ── Aurora blobs ── */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div
-          className="animate-blob absolute rounded-full"
-          style={{
-            width: 650, height: 650, top: "-15%", left: "-12%", opacity: 0.3,
-            background: "radial-gradient(circle, #4f46e5 0%, #7c3aed 45%, transparent 70%)",
-            filter: "blur(80px)", animationDuration: "18s",
-          }}
-        />
-        <div
-          className="animate-blob absolute rounded-full"
-          style={{
-            width: 550, height: 550, top: "45%", right: "-12%", opacity: 0.22,
-            background: "radial-gradient(circle, #0ea5e9 0%, #6366f1 45%, transparent 70%)",
-            filter: "blur(80px)", animationDuration: "22s", animationDelay: "3s",
-            animationDirection: "reverse",
-          }}
-        />
-        <div
-          className="animate-blob absolute rounded-full"
-          style={{
-            width: 480, height: 480, bottom: "-10%", left: "28%", opacity: 0.18,
-            background: "radial-gradient(circle, #8b5cf6 0%, #ec4899 50%, transparent 70%)",
-            filter: "blur(90px)", animationDuration: "26s", animationDelay: "6s",
-          }}
-        />
-        <div
-          className="animate-blob absolute rounded-full"
-          style={{
-            width: 320, height: 320, top: "18%", left: "52%", opacity: 0.14,
-            background: "radial-gradient(circle, #06b6d4 0%, #3b82f6 50%, transparent 70%)",
-            filter: "blur(70px)", animationDuration: "14s", animationDelay: "1s",
-          }}
-        />
+        <div className="animate-blob absolute rounded-full"
+          style={{ width: 700, height: 700, top: "-20%", left: "-15%", opacity: 0.35,
+            background: "radial-gradient(circle, #4338ca 0%, #7c3aed 40%, transparent 70%)",
+            filter: "blur(90px)", animationDuration: "20s" }} />
+        <div className="animate-blob absolute rounded-full"
+          style={{ width: 600, height: 600, bottom: "-15%", right: "-15%", opacity: 0.3,
+            background: "radial-gradient(circle, #0ea5e9 0%, #6366f1 40%, transparent 70%)",
+            filter: "blur(80px)", animationDuration: "25s", animationDelay: "4s",
+            animationDirection: "reverse" }} />
+        <div className="animate-blob absolute rounded-full"
+          style={{ width: 500, height: 500, top: "40%", left: "35%", opacity: 0.2,
+            background: "radial-gradient(circle, #ec4899 0%, #8b5cf6 50%, transparent 70%)",
+            filter: "blur(100px)", animationDuration: "30s", animationDelay: "8s" }} />
       </div>
 
       {/* ── Grid overlay ── */}
-      <div
-        className="fixed inset-0 pointer-events-none"
+      <div className="fixed inset-0 pointer-events-none"
         style={{
-          backgroundImage:
-            "linear-gradient(rgba(99,102,241,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.07) 1px, transparent 1px)",
-          backgroundSize: "60px 60px",
-        }}
-      />
+          backgroundImage: "linear-gradient(rgba(99,102,241,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.08) 1px, transparent 1px)",
+          backgroundSize: "64px 64px",
+        }} />
 
-      {/* ── Floating dots (uses animate-float from your config) ── */}
+      {/* ── Floating dots ── */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        {[...Array(12)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute rounded-full animate-float"
+        {[...Array(16)].map((_, i) => (
+          <div key={i} className="absolute rounded-full animate-float"
             style={{
-              left: `${8 + (i * 7.5) % 84}%`,
-              top: `${10 + (i * 8) % 75}%`,
-              width: `${2 + (i % 3)}px`,
-              height: `${2 + (i % 3)}px`,
-              background: i % 2 === 0 ? "rgba(139,92,246,0.45)" : "rgba(99,102,241,0.35)",
-              animationDelay: `${(i * 0.35) % 3}s`,
-              animationDuration: `${3 + (i % 3) * 0.5}s`,
-            }}
-          />
+              left: `${5 + (i * 6) % 90}%`,
+              top: `${5 + (i * 7) % 85}%`,
+              width: `${2 + (i % 4)}px`,
+              height: `${2 + (i % 4)}px`,
+              background: ["rgba(139,92,246,0.6)", "rgba(99,102,241,0.5)", "rgba(14,165,233,0.5)", "rgba(236,72,153,0.4)"][i % 4],
+              animationDelay: `${(i * 0.4) % 3}s`,
+              animationDuration: `${2.5 + (i % 4) * 0.5}s`,
+            }} />
         ))}
       </div>
 
       {/* ── Card ── */}
-      <div className="relative z-10 w-full max-w-[445px] animate-fade-in">
+      <div className="relative z-10 w-full max-w-[460px] animate-fade-in">
         <div
           className="rounded-3xl overflow-hidden"
           style={{
-            background: "rgba(8, 10, 24, 0.82)",
-            border: "1px solid rgba(99,102,241,0.22)",
-            backdropFilter: "blur(28px)",
-            WebkitBackdropFilter: "blur(28px)",
-            boxShadow:
-              "0 0 0 1px rgba(139,92,246,0.06), 0 40px 80px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.05)",
+            background: "linear-gradient(145deg, rgba(12,16,40,0.97) 0%, rgba(18,12,44,0.97) 100%)",
+            border: "1.5px solid rgba(129,140,248,0.28)",
+            backdropFilter: "blur(30px)",
+            WebkitBackdropFilter: "blur(30px)",
+            boxShadow: "0 0 0 1px rgba(139,92,246,0.06), 0 40px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.07)",
           }}
         >
           {/* Animated gradient top bar */}
           <div
-            className="h-[3px] w-full animate-gradient-rotate"
+            className="h-1 w-full animate-gradient-rotate"
             style={{
               background: "linear-gradient(90deg, #4f46e5, #7c3aed, #ec4899, #0ea5e9, #4f46e5)",
               backgroundSize: "300% 100%",
@@ -145,28 +141,29 @@ export default function Login() {
           {/* ── Header ── */}
           <div className="pt-10 px-10 text-center">
             <div
-              className="w-[68px] h-[68px] rounded-2xl mx-auto mb-5 flex items-center justify-center animate-pulse-glow"
+              className="w-[72px] h-[72px] rounded-2xl mx-auto mb-5 flex items-center justify-center animate-pulse-glow"
               style={{
                 background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
-                boxShadow: "0 8px 32px rgba(99,102,241,0.45)",
+                boxShadow: "0 8px 32px rgba(99,102,241,0.5)",
               }}
             >
-              <LogIn size={28} color="#fff" />
+              <LogIn size={30} color="#fff" />
             </div>
 
             <h1
-              className="text-[28px] font-extrabold tracking-tight mb-1.5"
+              className="text-3xl font-black tracking-tight mb-2"
               style={{
-                background: "linear-gradient(135deg, #e2e8ff 0%, #a5b4fc 55%, #c4b5fd 100%)",
+                background: "linear-gradient(135deg, #f8fafc 0%, #a5b4fc 55%, #c4b5fd 100%)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",
+                letterSpacing: "-0.02em",
               }}
             >
               Welcome Back
             </h1>
-            <p className="text-[13.5px]" style={{ color: "rgba(148,163,184,0.55)" }}>
-              Sign in to continue to CV Genix
+            <p className="text-sm font-medium" style={{ color: "rgba(165,180,252,0.6)" }}>
+              Sign in to continue to CV Genix ✨
             </p>
           </div>
 
@@ -178,30 +175,25 @@ export default function Login() {
               <div
                 className="mb-5 px-4 py-3 rounded-2xl flex items-center gap-3 animate-fade-in"
                 style={{
-                  background: "rgba(239,68,68,0.1)",
-                  border: "1px solid rgba(239,68,68,0.28)",
+                  background: "rgba(239,68,68,0.12)",
+                  border: "1.5px solid rgba(239,68,68,0.35)",
                 }}
               >
                 <AlertCircle size={15} color="#f87171" className="flex-shrink-0" />
-                <span className="text-[13px] font-medium" style={{ color: "#fca5a5" }}>{error}</span>
+                <span className="text-xs font-semibold" style={{ color: "#fca5a5" }}>{error}</span>
               </div>
             )}
 
             {/* Email field */}
             <div className="mb-5">
               <label
-                className="block text-[11px] font-semibold uppercase tracking-[0.1em] mb-2"
-                style={{ color: "rgba(148,163,184,0.5)" }}
+                className="block text-xs font-bold uppercase tracking-widest mb-2"
+                style={{ color: "rgba(165,180,252,0.75)" }}
               >
                 Email Address
               </label>
               <div className="relative">
-                <span
-                  className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none flex transition-colors duration-200"
-                  style={{ color: focusedField === "email" ? "#818cf8" : "rgba(148,163,184,0.35)" }}
-                >
-                  <Mail size={16} />
-                </span>
+                <span style={iconStyle("email")}><Mail size={16} /></span>
                 <input
                   type="email"
                   value={email}
@@ -210,14 +202,7 @@ export default function Login() {
                   onBlur={() => setFocusedField("")}
                   required
                   placeholder="you@example.com"
-                  className="w-full py-3.5 pl-11 pr-4 rounded-2xl text-[13.5px] outline-none transition-all duration-200"
-                  style={{
-                    background: focusedField === "email" ? "rgba(99,102,241,0.08)" : "rgba(255,255,255,0.03)",
-                    border: `1px solid ${focusedField === "email" ? "rgba(99,102,241,0.5)" : "rgba(99,102,241,0.15)"}`,
-                    boxShadow: focusedField === "email" ? "0 0 0 3px rgba(99,102,241,0.12)" : "none",
-                    color: "#e2e8f0",
-                    caretColor: "#818cf8",
-                  }}
+                  style={inputStyle("email")}
                 />
               </div>
             </div>
@@ -225,18 +210,13 @@ export default function Login() {
             {/* Password field */}
             <div className="mb-8">
               <label
-                className="block text-[11px] font-semibold uppercase tracking-[0.1em] mb-2"
-                style={{ color: "rgba(148,163,184,0.5)" }}
+                className="block text-xs font-bold uppercase tracking-widest mb-2"
+                style={{ color: "rgba(165,180,252,0.75)" }}
               >
                 Password
               </label>
               <div className="relative">
-                <span
-                  className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none flex transition-colors duration-200"
-                  style={{ color: focusedField === "password" ? "#818cf8" : "rgba(148,163,184,0.35)" }}
-                >
-                  <Lock size={16} />
-                </span>
+                <span style={iconStyle("password")}><Lock size={16} /></span>
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
@@ -245,22 +225,15 @@ export default function Login() {
                   onBlur={() => setFocusedField("")}
                   required
                   placeholder="Enter your password"
-                  className="w-full py-3.5 pl-11 pr-12 rounded-2xl text-[13.5px] outline-none transition-all duration-200"
-                  style={{
-                    background: focusedField === "password" ? "rgba(99,102,241,0.08)" : "rgba(255,255,255,0.03)",
-                    border: `1px solid ${focusedField === "password" ? "rgba(99,102,241,0.5)" : "rgba(99,102,241,0.15)"}`,
-                    boxShadow: focusedField === "password" ? "0 0 0 3px rgba(99,102,241,0.12)" : "none",
-                    color: "#e2e8f0",
-                    caretColor: "#818cf8",
-                  }}
+                  style={inputStyle("password", { paddingRight: 48 })}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 flex transition-colors duration-200"
-                  style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(148,163,184,0.4)" }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = "#818cf8"}
-                  onMouseLeave={(e) => e.currentTarget.style.color = "rgba(148,163,184,0.4)"}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(148,163,184,0.45)" }}
+                  onMouseEnter={(e) => e.currentTarget.style.color = "#a5b4fc"}
+                  onMouseLeave={(e) => e.currentTarget.style.color = "rgba(148,163,184,0.45)"}
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -271,29 +244,30 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 rounded-2xl text-[14px] font-bold text-white flex items-center justify-center gap-2 relative overflow-hidden transition-all duration-300"
+              className="w-full py-4 rounded-2xl text-sm font-black text-white flex items-center justify-center gap-2 relative overflow-hidden transition-all duration-300"
               style={{
                 background: loading
-                  ? "rgba(99,102,241,0.35)"
+                  ? "rgba(99,102,241,0.3)"
                   : "linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #6366f1 100%)",
-                boxShadow: loading ? "none" : "0 4px 24px rgba(99,102,241,0.42), 0 0 0 1px rgba(139,92,246,0.25)",
+                boxShadow: loading ? "none" : "0 4px 28px rgba(99,102,241,0.5), 0 0 0 1px rgba(139,92,246,0.3)",
                 cursor: loading ? "not-allowed" : "pointer",
+                letterSpacing: "0.02em",
               }}
               onMouseEnter={(e) => {
                 if (!loading) {
-                  e.currentTarget.style.transform = "translateY(-1px)";
-                  e.currentTarget.style.boxShadow = "0 8px 36px rgba(99,102,241,0.58), 0 0 0 1px rgba(139,92,246,0.4)";
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = "0 10px 40px rgba(99,102,241,0.65), 0 0 0 1px rgba(139,92,246,0.4)";
                 }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = loading ? "none" : "0 4px 24px rgba(99,102,241,0.42), 0 0 0 1px rgba(139,92,246,0.25)";
+                e.currentTarget.style.boxShadow = loading ? "none" : "0 4px 28px rgba(99,102,241,0.5), 0 0 0 1px rgba(139,92,246,0.3)";
               }}
             >
               {/* Gloss overlay */}
               <span
                 className="absolute inset-0 pointer-events-none"
-                style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 55%)" }}
+                style={{ background: "linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 55%)" }}
               />
               {loading ? (
                 <>
@@ -310,15 +284,15 @@ export default function Login() {
             </button>
 
             {/* Divider */}
-            <div className="flex items-center gap-4 my-7">
-              <div className="flex-1 h-px" style={{ background: "rgba(99,102,241,0.13)" }} />
+            <div className="flex items-center gap-3 my-7">
+              <div className="flex-1 h-px" style={{ background: "rgba(129,140,248,0.15)" }} />
               <span
-                className="text-[11px] font-semibold uppercase tracking-widest whitespace-nowrap"
-                style={{ color: "rgba(148,163,184,0.32)" }}
+                className="text-xs font-bold uppercase tracking-widest whitespace-nowrap"
+                style={{ color: "rgba(148,163,184,0.38)" }}
               >
                 or continue with
               </span>
-              <div className="flex-1 h-px" style={{ background: "rgba(99,102,241,0.13)" }} />
+              <div className="flex-1 h-px" style={{ background: "rgba(129,140,248,0.15)" }} />
             </div>
 
             {/* Social buttons */}
@@ -350,25 +324,25 @@ export default function Login() {
                   key={label}
                   type="button"
                   onClick={onClick}
-                  className="py-3 px-4 rounded-2xl text-[13px] font-semibold flex items-center justify-center gap-2 transition-all duration-200"
+                  className="py-3 px-4 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 transition-all duration-200"
                   style={{
-                    background: "rgba(255,255,255,0.03)",
-                    border: "1px solid rgba(99,102,241,0.17)",
-                    color: "rgba(226,232,240,0.75)",
+                    background: "rgba(255,255,255,0.04)",
+                    border: "1.5px solid rgba(148,163,184,0.2)",
+                    color: "rgba(226,232,240,0.8)",
                     cursor: "pointer",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(99,102,241,0.09)";
-                    e.currentTarget.style.borderColor = "rgba(99,102,241,0.38)";
-                    e.currentTarget.style.transform = "translateY(-1px)";
+                    e.currentTarget.style.background = "rgba(99,102,241,0.14)";
+                    e.currentTarget.style.borderColor = "rgba(129,140,248,0.45)";
+                    e.currentTarget.style.transform = "translateY(-2px)";
                     e.currentTarget.style.color = "#e2e8f0";
-                    e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.3)";
+                    e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,0.3)";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "rgba(255,255,255,0.03)";
-                    e.currentTarget.style.borderColor = "rgba(99,102,241,0.17)";
+                    e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+                    e.currentTarget.style.borderColor = "rgba(148,163,184,0.2)";
                     e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.color = "rgba(226,232,240,0.75)";
+                    e.currentTarget.style.color = "rgba(226,232,240,0.8)";
                     e.currentTarget.style.boxShadow = "none";
                   }}
                 >
@@ -378,15 +352,18 @@ export default function Login() {
               ))}
             </div>
 
-            {/* Sign up */}
-            <div className="text-center text-[13.5px]" style={{ color: "rgba(148,163,184,0.5)" }}>
-              Don't have an account?{" "}
+            {/* Sign up link */}
+            <div className="text-center py-3 px-4 rounded-2xl"
+              style={{ background: "rgba(99,102,241,0.08)", border: "1.5px solid rgba(129,140,248,0.18)" }}>
+              <span className="text-sm font-medium" style={{ color: "rgba(203,213,225,0.65)" }}>
+                Don't have an account?{" "}
+              </span>
               <Link
                 to="/signup"
-                className="font-bold transition-colors duration-200"
-                style={{ color: "#818cf8" }}
-                onMouseEnter={(e) => e.currentTarget.style.color = "#a5b4fc"}
-                onMouseLeave={(e) => e.currentTarget.style.color = "#818cf8"}
+                className="text-sm font-black transition-colors duration-200"
+                style={{ color: "#a5b4fc" }}
+                onMouseEnter={(e) => e.currentTarget.style.color = "#c4b5fd"}
+                onMouseLeave={(e) => e.currentTarget.style.color = "#a5b4fc"}
               >
                 Sign up now →
               </Link>
@@ -395,11 +372,11 @@ export default function Login() {
         </div>
 
         {/* Footer */}
-        <div className="mt-6 text-center text-[11.5px]" style={{ color: "rgba(148,163,184,0.27)" }}>
+        <div className="mt-5 text-center text-xs font-medium" style={{ color: "rgba(148,163,184,0.32)" }}>
           By signing in, you agree to our{" "}
-          <a href="#" style={{ color: "rgba(129,140,248,0.55)" }}>Terms of Service</a>{" "}
+          <a href="#" style={{ color: "rgba(165,180,252,0.55)" }}>Terms of Service</a>{" "}
           and{" "}
-          <a href="#" style={{ color: "rgba(129,140,248,0.55)" }}>Privacy Policy</a>
+          <a href="#" style={{ color: "rgba(165,180,252,0.55)" }}>Privacy Policy</a>
         </div>
       </div>
     </div>

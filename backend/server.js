@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import { fileURLToPath } from "url";
 import connectDB from "./config/db.js";
+import aiRoutes from "./routes/aiRoutes.js";
 
 // Route Imports
 import authRoutes from "./routes/authRoutes.js";
@@ -22,11 +23,13 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
+
 // API Routes
 app.use("/auth", authRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/resumes", resumeRoutes);
 app.use("/api/market", marketRoutes); // 2. Register the market route
+app.use("/api/ai", aiRoutes);
 
 /* ---------- Serve Frontend (React/Vite) ---------- */
 // Static files from the 'dist' folder

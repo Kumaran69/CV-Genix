@@ -11,9 +11,9 @@ import {
   DollarSign, ExternalLink, Shield,
 } from "lucide-react";
 
-import JobList        from "../components/job-recommendations/JobList";
+import JobList         from "../components/job-recommendations/JobList";
 import MarketDashboard from "../components/market-analytics/MarketDashboard";
-import ATSDashboard   from "../components/ats/ATSDashboard";
+import ATSDashboard    from "../components/ats/ATSDashboard";
 import KeywordOptimizer from "../components/ats/KeywordOptimizer";
 
 export default function Dashboard() {
@@ -106,22 +106,18 @@ export default function Dashboard() {
   };
 
   // ── Navigation handlers ───────────────────────────────────────────────
-
-  // ✅ Edit → /builder/:id
   const handleEdit = (resume) => {
     const id = getResumeId(resume);
     if (!id) { console.error("Edit failed — no valid ID:", resume); return; }
     navigate(`/builder/${id}`);
   };
 
-  // ✅ Preview → /preview/:id
   const handlePreview = (resume) => {
     const id = getResumeId(resume);
     if (!id) { console.error("Preview failed — no valid ID:", resume); return; }
     navigate(`/preview/${id}`);
   };
 
-  // ✅ Delete
   const handleDelete = async (resume) => {
     const id = getResumeId(resume);
     if (!id) { console.error("Delete failed — no valid ID:", resume); return; }
@@ -132,7 +128,6 @@ export default function Dashboard() {
     } catch (e) { console.error("Delete error:", e); }
   };
 
-  // ✅ ATS shield → select resume + switch to ATS tab
   const handleATSClick = (resume) => {
     setSelectedResumeForATS(resume);
     setAtsAnalysis(calculateATSScore(resume));
@@ -141,6 +136,8 @@ export default function Dashboard() {
 
   // ── Data fetching ─────────────────────────────────────────────────────
 
+  // ✅ FIX: jobService now calls /api/ai/anthropic on YOUR backend
+  //         instead of https://api.anthropic.com directly — no more CORS
   const fetchJobRecommendations = useCallback(async (skills) => {
     try {
       setLoadingJobs(true);
@@ -150,6 +147,7 @@ export default function Dashboard() {
     } catch (e) { console.error(e); } finally { setLoadingJobs(false); }
   }, [token]);
 
+  // ✅ FIX: marketAnalytics now also calls /api/ai/anthropic on YOUR backend
   const fetchMarketAnalytics = useCallback(async (skills) => {
     try {
       setLoadingMarket(true);
@@ -157,8 +155,8 @@ export default function Dashboard() {
       setMarketAnalytics(res.data);
       if (res.data) setStats((p) => ({
         ...p,
-        marketDemand:  res.data.demandScore    || 0,
-        avgSalary:     res.data.averageSalary  || 0,
+        marketDemand:   res.data.demandScore    || 0,
+        avgSalary:      res.data.averageSalary  || 0,
         trendingSkills: res.data.trendingSkills || [],
       }));
     } catch (e) { console.error(e); } finally { setLoadingMarket(false); }
@@ -174,7 +172,6 @@ export default function Dashboard() {
         : Array.isArray(raw?.data)    ? raw.data
         : [];
 
-      // Normalize — _id is always a plain string
       const list = rawList.map((r) => {
         const id = getResumeId(r);
         return { ...r, _id: id, id };
@@ -367,11 +364,11 @@ export default function Dashboard() {
         {/* Stat Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           {[
-            { label:"Total Resumes",  value: stats.total,                                                       icon:FileText,  color:"from-blue-500 to-indigo-500",   delay:"fade-up-1" },
-            { label:"ATS Pass Rate",  value:`${stats.atsPassRate}%`, sub:`Avg: ${stats.avgATSScore}%`,           icon:Shield,    color: stats.avgATSScore >= 75 ? "from-emerald-500 to-teal-500" : "from-amber-500 to-orange-500", delay:"fade-up-2" },
-            { label:"Job Matches",    value: stats.jobMatches,       sub:"Based on your skills",                 icon:Target,    color:"from-purple-500 to-pink-500",   delay:"fade-up-3" },
-            { label:"Market Demand",  value:`${stats.marketDemand}%`,                                            icon:TrendingUp,color:"from-cyan-500 to-blue-500",     delay:"fade-up-4" },
-            { label:"Avg. Salary",    value:`$${stats.avgSalary ? (stats.avgSalary/1000).toFixed(0)+"k" : "—"}`,sub:"For your skills", icon:DollarSign, color:"from-green-500 to-emerald-500", delay:"fade-up-4" },
+            { label:"Total Resumes", value: stats.total,                                                        icon:FileText,   color:"from-blue-500 to-indigo-500",   delay:"fade-up-1" },
+            { label:"ATS Pass Rate", value:`${stats.atsPassRate}%`, sub:`Avg: ${stats.avgATSScore}%`,            icon:Shield,     color: stats.avgATSScore >= 75 ? "from-emerald-500 to-teal-500" : "from-amber-500 to-orange-500", delay:"fade-up-2" },
+            { label:"Job Matches",   value: stats.jobMatches,       sub:"Based on your skills",                  icon:Target,     color:"from-purple-500 to-pink-500",   delay:"fade-up-3" },
+            { label:"Market Demand", value:`${stats.marketDemand}%`,                                             icon:TrendingUp, color:"from-cyan-500 to-blue-500",     delay:"fade-up-4" },
+            { label:"Avg. Salary",   value:`$${stats.avgSalary ? (stats.avgSalary/1000).toFixed(0)+"k" : "—"}`, sub:"For your skills", icon:DollarSign, color:"from-green-500 to-emerald-500", delay:"fade-up-4" },
           ].map(({ label, value, sub, icon: Icon, color, delay }) => (
             <div key={label} className={`${t.card} border rounded-2xl p-5 card-hover ${delay}`}>
               <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center mb-3`}>
@@ -403,7 +400,6 @@ export default function Dashboard() {
         {/* ── RESUMES TAB ─────────────────────────────────────────────── */}
         {activeTab === "resumes" && (
           <>
-            {/* Search + Filter */}
             <div className={`${t.card} border rounded-2xl p-4 mb-6 flex flex-col sm:flex-row gap-3`}>
               <div className="relative flex-1">
                 <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${t.sub}`} />
@@ -426,7 +422,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Resume Grid */}
             {loading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {[1,2,3].map((i) => <div key={i} className={`${t.card} border rounded-2xl p-6 shimmer h-48`} />)}
@@ -461,7 +456,6 @@ export default function Dashboard() {
                       className={`${t.card} border rounded-2xl p-5 card-hover relative overflow-hidden`}
                       style={{ animationDelay: `${i * 0.05}s` }}>
 
-                      {/* ATS Badge */}
                       {atsScore >= 75 && (
                         <div className="absolute top-3 right-3 z-10">
                           <div className={`flex items-center gap-1 px-2 py-1 rounded-lg ${
@@ -472,7 +466,6 @@ export default function Dashboard() {
                         </div>
                       )}
 
-                      {/* Header */}
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center gap-3">
                           <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${statusColor(completion)} flex items-center justify-center text-white font-bold text-sm`}>
@@ -494,7 +487,6 @@ export default function Dashboard() {
                         )}
                       </div>
 
-                      {/* Completion bar */}
                       <div className="mb-3">
                         <div className="flex justify-between text-xs mb-1.5">
                           <span className={t.sub}>{statusLabel(completion)}</span>
@@ -506,7 +498,6 @@ export default function Dashboard() {
                         </div>
                       </div>
 
-                      {/* ATS bar */}
                       <div className="mb-3">
                         <div className="flex justify-between text-xs mb-1.5">
                           <span className={t.sub}>ATS Score</span>
@@ -523,7 +514,6 @@ export default function Dashboard() {
                         </div>
                       </div>
 
-                      {/* Meta */}
                       <div className={`flex items-center justify-between text-xs ${t.sub} mb-4`}>
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />{formatDate(resume.updatedAt)}
@@ -533,53 +523,31 @@ export default function Dashboard() {
                         )}
                       </div>
 
-                      {/* ── Action Buttons ───────────────────────────── */}
                       <div className="flex items-center gap-2">
-
-                        {/* ✅ Edit → navigates to /builder/:id */}
-                        <button
-                          onClick={() => handleEdit(resume)}
-                          disabled={!resumeId}
+                        <button onClick={() => handleEdit(resume)} disabled={!resumeId}
                           title="Edit resume"
-                          className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors"
-                        >
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors">
                           <Edit2 className="w-3.5 h-3.5" /> Edit
                         </button>
-
-                        {/* ✅ ATS Shield → selects resume + switches to ATS tab */}
-                        <button
-                          onClick={() => handleATSClick(resume)}
-                          title="View ATS analysis"
+                        <button onClick={() => handleATSClick(resume)} title="View ATS analysis"
                           className={`p-2 rounded-lg border transition-colors ${
                             atsScore >= 75
                               ? "border-emerald-500 text-emerald-500 hover:bg-emerald-50"
                               : "border-amber-500 text-amber-500 hover:bg-amber-50"
-                          }`}
-                        >
+                          }`}>
                           <Shield className="w-4 h-4" />
                         </button>
-
-                        {/* ✅ Preview → navigates to /preview/:id */}
-                        <button
-                          onClick={() => handlePreview(resume)}
-                          disabled={!resumeId}
+                        <button onClick={() => handlePreview(resume)} disabled={!resumeId}
                           title="Preview resume"
                           className={`p-2 rounded-lg border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-                            darkMode
-                              ? "border-gray-700 text-gray-300 hover:bg-gray-800"
-                              : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                          }`}
-                        >
+                            darkMode ? "border-gray-700 text-gray-300 hover:bg-gray-800"
+                                     : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                          }`}>
                           <Eye className="w-4 h-4" />
                         </button>
-
-                        {/* ✅ Delete */}
-                        <button
-                          onClick={() => handleDelete(resume)}
-                          disabled={!resumeId}
+                        <button onClick={() => handleDelete(resume)} disabled={!resumeId}
                           title="Delete resume"
-                          className="p-2 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                        >
+                          className="p-2 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -587,7 +555,6 @@ export default function Dashboard() {
                   );
                 })}
 
-                {/* Add New Card */}
                 <button onClick={() => navigate("/builder")}
                   className={`${t.card} border-2 border-dashed rounded-2xl p-5 flex flex-col items-center justify-center gap-3 ${t.hover} transition-colors group min-h-[200px]`}>
                   <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
@@ -669,7 +636,6 @@ export default function Dashboard() {
         {/* ── BOTTOM STRIP ─────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-10">
 
-          {/* Quick Actions */}
           <div className={`${t.card} border rounded-2xl p-5`}>
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center">
@@ -679,10 +645,10 @@ export default function Dashboard() {
             </div>
             <div className="space-y-1">
               {[
-                { label:"New Resume",        icon:Plus,        action:() => navigate("/builder") },
-                { label:"Check ATS Score",   icon:Shield,      action:() => setActiveTab("ats") },
-                { label:"Optimize Keywords", icon:Sparkles,    action:() => setActiveTab("keywords") },
-                { label:"Find Jobs",         icon:ExternalLink,action:() => setActiveTab("jobs") },
+                { label:"New Resume",        icon:Plus,         action:() => navigate("/builder") },
+                { label:"Check ATS Score",   icon:Shield,       action:() => setActiveTab("ats") },
+                { label:"Optimize Keywords", icon:Sparkles,     action:() => setActiveTab("keywords") },
+                { label:"Find Jobs",         icon:ExternalLink, action:() => setActiveTab("jobs") },
               ].map(({ label, icon: Icon, action }) => (
                 <button key={label} onClick={action}
                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium ${t.text} ${t.hover} transition-colors`}>
@@ -692,7 +658,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Trending Skills */}
           <div className={`${t.card} border rounded-2xl p-5`}>
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
@@ -715,7 +680,6 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* ATS Insight */}
           <div className={`${t.card} border rounded-2xl p-5`}>
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
@@ -744,7 +708,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* CTA Banner */}
         {resumes.length > 0 && stats.completed > 0 && (
           <div className="mt-8 rounded-2xl bg-gradient-to-r from-blue-600 to-violet-600 p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
