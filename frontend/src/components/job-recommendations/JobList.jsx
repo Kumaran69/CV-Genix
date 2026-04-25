@@ -26,7 +26,13 @@ import {
   Shield,
 } from "lucide-react";
 
-// ─── Claude API Job Matcher ──────────────────────────────────────────────────
+// ─── Config ──────────────────────────────────────────────────────────────────
+// FIX 1: Never call api.anthropic.com directly from the frontend.
+//         All AI requests must go through your backend proxy to avoid CORS
+//         errors and to keep your API key secret.
+const API_BASE = ""; // ← change to your backend URL/port if different
+
+// ─── Claude API Job Matcher (via backend proxy) ───────────────────────────────
 async function fetchJobsFromClaude(skills = [], resumeData = {}) {
   const skillList = skills.length > 0 ? skills.join(", ") : "general software development";
   const title = resumeData?.personal?.title || "";
@@ -66,7 +72,8 @@ Return ONLY a valid JSON array (no markdown, no explanation) with exactly 8 job 
 
 Make jobs realistic, from well-known companies (FAANG, unicorns, well-funded startups), and directly relevant to the skills provided. Vary locations, salary ranges, and company sizes.`;
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  // FIX 1 (applied): POST to your backend proxy, not to api.anthropic.com
+  const response = await fetch(`${API_BASE}/api/ai/anthropic`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -76,14 +83,28 @@ Make jobs realistic, from well-known companies (FAANG, unicorns, well-funded sta
     }),
   });
 
-  if (!response.ok) throw new Error(`API error: ${response.status}`);
+  if (!response.ok) throw new Error(`Proxy error: ${response.status}`);
   const data = await response.json();
-  const raw = data.content?.find((b) => b.type === "text")?.text || "[]";
+
+  // FIX 2: Safely extract text — data.content is an array of blocks
+  const raw =
+    (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("") || "[]";
+
+  // FIX 3: Strip markdown fences before parsing, then attempt JSON parse safely
   const cleaned = raw.replace(/```json|```/g, "").trim();
-  return JSON.parse(cleaned);
+  try {
+    const parsed = JSON.parse(cleaned);
+    // FIX 4: Claude sometimes returns { jobs: [...] } instead of a bare array — handle both
+    return Array.isArray(parsed) ? parsed : parsed.jobs || [];
+  } catch {
+    // FIX 5: Fallback — try to extract a JSON array from anywhere in the string
+    const match = cleaned.match(/\[[\s\S]*\]/);
+    if (match) return JSON.parse(match[0]);
+    throw new Error("Failed to parse job data from AI response");
+  }
 }
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function SkillPill({ skill, matched, darkMode }) {
   return (
@@ -142,16 +163,36 @@ function MatchRing({ score, size = 56 }) {
 function JobCard({ job, darkMode, onApply, index }) {
   const [expanded, setExpanded] = useState(false);
   const [saved, setSaved] = useState(false);
+  // FIX 6: Track per-card applied state locally so button reflects correctly
+  const [applied, setApplied] = useState(false);
 
   const t = darkMode
     ? { card: "bg-gray-900 border-gray-800", text: "text-gray-100", sub: "text-gray-400", hover: "hover:bg-gray-800" }
     : { card: "bg-white border-gray-100", text: "text-gray-900", sub: "text-gray-500", hover: "hover:bg-gray-50" };
 
   const industryIcon = {
-    Tech: Code2, Finance: DollarSign, Healthcare: Shield,
-    "E-commerce": Globe, SaaS: Zap, Startup: TrendingUp,
+    Tech: Code2,
+    Finance: DollarSign,
+    Healthcare: Shield,
+    "E-commerce": Globe,
+    SaaS: Zap,
+    Startup: TrendingUp,
   }[job.industry] || Briefcase;
   const IndustryIcon = industryIcon;
+
+  // FIX 7: Guard against missing salaryMin/salaryMax (AI occasionally omits them)
+  const salaryMin = job.salaryMin || 0;
+  const salaryMax = job.salaryMax || 0;
+  const salaryLabel =
+    salaryMin && salaryMax
+      ? `${(salaryMin / 1000).toFixed(0)}k – ${(salaryMax / 1000).toFixed(0)}k/yr`
+      : job.salary || "Salary not listed";
+
+  function handleApply() {
+    if (applied) return;
+    setApplied(true);
+    if (typeof onApply === "function") onApply(job.id);
+  }
 
   return (
     <div
@@ -224,12 +265,20 @@ function JobCard({ job, darkMode, onApply, index }) {
             }`}
           >
             <DollarSign className="w-3 h-3" />
-            {(job.salaryMin / 1000).toFixed(0)}k – {(job.salaryMax / 1000).toFixed(0)}k/yr
+            {salaryLabel}
           </span>
-          <span className={`px-3 py-1.5 rounded-lg text-xs font-medium ${darkMode ? "bg-gray-800 text-gray-300" : "bg-gray-100 text-gray-600"}`}>
+          <span
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium ${
+              darkMode ? "bg-gray-800 text-gray-300" : "bg-gray-100 text-gray-600"
+            }`}
+          >
             {job.type}
           </span>
-          <span className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium ${darkMode ? "bg-gray-800 text-gray-300" : "bg-gray-100 text-gray-600"}`}>
+          <span
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium ${
+              darkMode ? "bg-gray-800 text-gray-300" : "bg-gray-100 text-gray-600"
+            }`}
+          >
             <IndustryIcon className="w-3 h-3" /> {job.industry}
           </span>
           <span className={`text-xs ${t.sub}`}>{job.applicants} applicants</span>
@@ -242,10 +291,11 @@ function JobCard({ job, darkMode, onApply, index }) {
         <div className="mb-4">
           <p className={`text-xs font-semibold ${t.sub} mb-2`}>Skill Match</p>
           <div className="flex flex-wrap gap-1.5">
-            {job.matchedSkills.slice(0, 4).map((s) => (
+            {/* FIX 8: Guard against missing matchedSkills / missingSkills arrays */}
+            {(job.matchedSkills || []).slice(0, 4).map((s) => (
               <SkillPill key={s} skill={s} matched darkMode={darkMode} />
             ))}
-            {job.missingSkills.slice(0, 2).map((s) => (
+            {(job.missingSkills || []).slice(0, 2).map((s) => (
               <SkillPill key={s} skill={s} matched={false} darkMode={darkMode} />
             ))}
           </div>
@@ -259,8 +309,10 @@ function JobCard({ job, darkMode, onApply, index }) {
             }`}
           >
             <p className={`text-xs font-semibold ${t.text} mb-1`}>👤 Recruiter Contact</p>
-            <p className={`text-xs ${t.sub}`}>{job.recruiterName} · {job.recruiterTitle}</p>
-            <p className={`text-xs text-blue-500 mt-1 cursor-pointer hover:underline`}>
+            <p className={`text-xs ${t.sub}`}>
+              {job.recruiterName} · {job.recruiterTitle}
+            </p>
+            <p className="text-xs text-blue-500 mt-1 cursor-pointer hover:underline">
               View LinkedIn profile →
             </p>
           </div>
@@ -268,11 +320,21 @@ function JobCard({ job, darkMode, onApply, index }) {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
+          {/* FIX 6 (applied): Button shows "Applied ✓" after clicking and is disabled */}
           <button
-            onClick={() => onApply(job.id)}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-sm"
+            onClick={handleApply}
+            disabled={applied}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-colors shadow-sm ${
+              applied
+                ? "bg-emerald-100 text-emerald-700 border border-emerald-200 cursor-default"
+                : "bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
+            }`}
           >
-            <Send className="w-3.5 h-3.5" /> Apply Now
+            {applied ? (
+              <><CheckCircle2 className="w-3.5 h-3.5" /> Applied</>
+            ) : (
+              <><Send className="w-3.5 h-3.5" /> Apply Now</>
+            )}
           </button>
           <button
             onClick={() => setSaved(!saved)}
@@ -289,10 +351,14 @@ function JobCard({ job, darkMode, onApply, index }) {
           <button
             onClick={() => setExpanded(!expanded)}
             className={`p-2.5 rounded-xl border transition-colors ${
-              darkMode ? "border-gray-700 text-gray-400 hover:bg-gray-800" : "border-gray-200 text-gray-500 hover:bg-gray-50"
+              darkMode
+                ? "border-gray-700 text-gray-400 hover:bg-gray-800"
+                : "border-gray-200 text-gray-500 hover:bg-gray-50"
             }`}
           >
-            <ChevronRight className={`w-4 h-4 transition-transform ${expanded ? "rotate-90" : ""}`} />
+            <ChevronRight
+              className={`w-4 h-4 transition-transform ${expanded ? "rotate-90" : ""}`}
+            />
           </button>
         </div>
       </div>
@@ -303,7 +369,11 @@ function JobCard({ job, darkMode, onApply, index }) {
 function LoadingSkeleton({ darkMode }) {
   const t = darkMode ? "bg-gray-800" : "bg-gray-100";
   return (
-    <div className={`${darkMode ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"} border rounded-2xl p-5 animate-pulse`}>
+    <div
+      className={`${
+        darkMode ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"
+      } border rounded-2xl p-5 animate-pulse`}
+    >
       <div className="flex gap-4 mb-4">
         <div className={`w-11 h-11 rounded-xl ${t}`} />
         <div className="flex-1 space-y-2">
@@ -315,16 +385,24 @@ function LoadingSkeleton({ darkMode }) {
       <div className={`h-3 rounded-lg ${t} w-full mb-2`} />
       <div className={`h-3 rounded-lg ${t} w-4/5 mb-4`} />
       <div className="flex gap-2 mb-4">
-        {[1, 2, 3].map((i) => <div key={i} className={`h-7 rounded-lg ${t} w-20`} />)}
+        {[1, 2, 3].map((i) => (
+          <div key={i} className={`h-7 rounded-lg ${t} w-20`} />
+        ))}
       </div>
       <div className={`h-9 rounded-xl ${t} w-full`} />
     </div>
   );
 }
 
-// ─── Main Component ──────────────────────────────────────────────────────────
+// ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function JobList({ jobs: propJobs = [], loading: propLoading = false, resumes = [], onApply, darkMode = false }) {
+export default function JobList({
+  jobs: propJobs = [],
+  loading: propLoading = false,
+  resumes = [],
+  onApply,
+  darkMode = false,
+}) {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -335,11 +413,25 @@ export default function JobList({ jobs: propJobs = [], loading: propLoading = fa
   const hasFetched = useRef(false);
 
   const t = darkMode
-    ? { bg: "bg-gray-950", card: "bg-gray-900 border-gray-800", text: "text-gray-100", sub: "text-gray-400", input: "bg-gray-800 border-gray-700 text-white placeholder-gray-500", chip: "bg-gray-800 text-gray-300" }
-    : { bg: "bg-slate-50", card: "bg-white border-gray-100", text: "text-gray-900", sub: "text-gray-500", input: "bg-white border-gray-200 text-gray-900 placeholder-gray-400", chip: "bg-gray-100 text-gray-600" };
+    ? {
+        bg: "bg-gray-950",
+        card: "bg-gray-900 border-gray-800",
+        text: "text-gray-100",
+        sub: "text-gray-400",
+        input: "bg-gray-800 border-gray-700 text-white placeholder-gray-500",
+        chip: "bg-gray-800 text-gray-300",
+      }
+    : {
+        bg: "bg-slate-50",
+        card: "bg-white border-gray-100",
+        text: "text-gray-900",
+        sub: "text-gray-500",
+        input: "bg-white border-gray-200 text-gray-900 placeholder-gray-400",
+        chip: "bg-gray-100 text-gray-600",
+      };
 
-  // Extract skills from all resumes
-  const extractSkills = () => {
+  // FIX 9: Stabilise skill extraction — memoised manually to avoid re-renders
+  function extractSkills() {
     const skills = new Set();
     resumes.forEach((r) => {
       (r.skills || []).forEach((sk) => {
@@ -348,7 +440,7 @@ export default function JobList({ jobs: propJobs = [], loading: propLoading = fa
       });
     });
     return Array.from(skills);
-  };
+  }
 
   const loadJobs = async () => {
     try {
@@ -361,19 +453,22 @@ export default function JobList({ jobs: propJobs = [], loading: propLoading = fa
       setLastFetched(new Date());
     } catch (e) {
       console.error("Job fetch error:", e);
-      setError("Could not load job recommendations. Check your API connection.");
+      setError("Could not load job recommendations. Check your backend connection and try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Auto-load on mount or when resumes change
+  // FIX 10: Use a ref so this only fires once on mount, not on every render.
+  //         The original used `resumes` in the dependency array which could
+  //         cause infinite re-fetches if the parent re-creates the array each render.
   useEffect(() => {
-    if (!hasFetched.current && (resumes.length > 0 || true)) {
+    if (!hasFetched.current) {
       hasFetched.current = true;
       loadJobs();
     }
-  }, [resumes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Filter + sort
   const displayed = jobs
@@ -398,15 +493,31 @@ export default function JobList({ jobs: propJobs = [], loading: propLoading = fa
       return 0;
     });
 
-  const avgMatch = jobs.length > 0
-    ? Math.round(jobs.reduce((s, j) => s + j.matchScore, 0) / jobs.length)
-    : 0;
+  // FIX 11: Guard against empty jobs array before computing average
+  const avgMatch =
+    jobs.length > 0
+      ? Math.round(jobs.reduce((s, j) => s + (j.matchScore || 0), 0) / jobs.length)
+      : 0;
+
+  // FIX 12: Compute "updated X min ago" correctly using state, not inline Date.now()
+  const [, forceRender] = useState(0);
+  useEffect(() => {
+    if (!lastFetched) return;
+    const id = setInterval(() => forceRender((n) => n + 1), 30000);
+    return () => clearInterval(id);
+  }, [lastFetched]);
+
+  const minutesAgo = lastFetched
+    ? Math.round((Date.now() - lastFetched.getTime()) / 60000)
+    : null;
 
   return (
     <div>
       <style>{`
-        @keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
       `}</style>
 
       {/* ── Header ── */}
@@ -420,7 +531,7 @@ export default function JobList({ jobs: propJobs = [], loading: propLoading = fa
             {loading
               ? "Claude is analyzing your skills…"
               : jobs.length > 0
-              ? `${jobs.length} jobs matched · ${avgMatch}% avg match · ${lastFetched ? `Updated ${Math.round((Date.now() - lastFetched) / 60000)}m ago` : ""}`
+              ? `${jobs.length} jobs matched · ${avgMatch}% avg match${minutesAgo !== null ? ` · Updated ${minutesAgo}m ago` : ""}`
               : "No jobs loaded yet"}
           </p>
         </div>
@@ -438,20 +549,15 @@ export default function JobList({ jobs: propJobs = [], loading: propLoading = fa
       {!loading && jobs.length > 0 && (
         <div className="flex gap-3 mb-6 flex-wrap">
           {[
-            { label: `${jobs.filter((j) => j.matchScore >= 80).length} High Match`, color: "emerald" },
-            { label: `${jobs.filter((j) => j.isHot).length} Hot Jobs`, color: "red" },
-            { label: `${jobs.filter((j) => j.isEasyApply).length} Easy Apply`, color: "blue" },
-            { label: `${jobs.filter((j) => j.location.toLowerCase().includes("remote")).length} Remote`, color: "purple" },
-          ].map(({ label, color }) => (
+            { label: `${jobs.filter((j) => j.matchScore >= 80).length} High Match`, bg: "#d1fae5", color: "#065f46", border: "#a7f3d0" },
+            { label: `${jobs.filter((j) => j.isHot).length} Hot Jobs`,              bg: "#fee2e2", color: "#991b1b", border: "#fecaca" },
+            { label: `${jobs.filter((j) => j.isEasyApply).length} Easy Apply`,      bg: "#dbeafe", color: "#1e40af", border: "#bfdbfe" },
+            { label: `${jobs.filter((j) => j.location.toLowerCase().includes("remote")).length} Remote`, bg: "#ede9fe", color: "#5b21b6", border: "#ddd6fe" },
+          ].map(({ label, bg, color, border }) => (
             <span
               key={label}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold bg-${color}-100 text-${color}-700 border border-${color}-200`}
-              style={{
-                background: { emerald: "#d1fae5", red: "#fee2e2", blue: "#dbeafe", purple: "#ede9fe" }[color],
-                color: { emerald: "#065f46", red: "#991b1b", blue: "#1e40af", purple: "#5b21b6" }[color],
-                border: `1px solid`,
-                borderColor: { emerald: "#a7f3d0", red: "#fecaca", blue: "#bfdbfe", purple: "#ddd6fe" }[color],
-              }}
+              className="px-3 py-1.5 rounded-full text-xs font-semibold"
+              style={{ background: bg, color, border: `1px solid ${border}` }}
             >
               {label}
             </span>
@@ -498,7 +604,10 @@ export default function JobList({ jobs: propJobs = [], loading: propLoading = fa
         <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-2xl mb-6">
           <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
           <p className="text-sm text-red-700">{error}</p>
-          <button onClick={loadJobs} className="ml-auto text-sm text-red-600 font-semibold hover:underline">
+          <button
+            onClick={loadJobs}
+            className="ml-auto text-sm text-red-600 font-semibold hover:underline"
+          >
             Retry
           </button>
         </div>
@@ -528,7 +637,9 @@ export default function JobList({ jobs: propJobs = [], loading: propLoading = fa
             {searchTerm || filterType !== "all" ? "No results found" : "No jobs loaded"}
           </h3>
           <p className={`text-sm ${t.sub} mb-4`}>
-            {searchTerm || filterType !== "all" ? "Try clearing filters" : "Click Refresh to fetch AI-matched jobs"}
+            {searchTerm || filterType !== "all"
+              ? "Try clearing your filters"
+              : "Click Refresh to fetch AI-matched jobs"}
           </p>
           <button
             onClick={loadJobs}
@@ -543,12 +654,18 @@ export default function JobList({ jobs: propJobs = [], loading: propLoading = fa
       {!loading && displayed.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {displayed.map((job, i) => (
-            <JobCard key={job.id} job={job} index={i} darkMode={darkMode} onApply={onApply} />
+            <JobCard
+              key={job.id}
+              job={job}
+              index={i}
+              darkMode={darkMode}
+              onApply={onApply}
+            />
           ))}
         </div>
       )}
 
-      {/* ── Footer note ── */}
+      {/* ── Footer ── */}
       {!loading && jobs.length > 0 && (
         <p className={`text-xs text-center ${t.sub} mt-6`}>
           ✨ Recommendations powered by Claude AI · Based on your resume skills

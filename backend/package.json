@@ -18,6 +18,7 @@
   "author": "Kumaran Kumaran",
   "license": "MIT",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.0",
     "axios": "^1.13.2",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
@@ -28,6 +29,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.1.1",
     "multer": "^1.4.5-lts.1",
+    "node-fetch": "^3.3.2",
     "pdfkit": "^0.15.0",
     "uuid": "^9.0.1"
   },
