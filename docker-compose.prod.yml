@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+
+  # ── MongoDB ───────────────────────────────────────────
+  mongodb:
+    image: mongo:7.0
+    container_name: cvgenix-mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: cvgenix
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - cvgenix-net
+
+  # ── Backend: pulls from Docker Hub ───────────────────
+  backend:
+    image: ${DOCKERHUB_USERNAME}/cvgenix-backend:latest
+    container_name: cvgenix-backend
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGODB_URI: mongodb://admin:${MONGO_ROOT_PASSWORD}@mongodb:27017/cvgenix?authSource=admin
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      - mongodb
+    networks:
+      - cvgenix-net
+
+  # ── Frontend: pulls from Docker Hub ──────────────────
+  frontend:
+    image: ${DOCKERHUB_USERNAME}/cvgenix-frontend:latest
+    container_name: cvgenix-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - cvgenix-net
+
+networks:
+  cvgenix-net:
+    driver: bridge
+
+volumes:
+  mongo-data:

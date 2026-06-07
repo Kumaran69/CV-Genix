@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+
+  # ── MongoDB ───────────────────────────────────────────
+  mongodb:
+    image: mongo:7.0
+    container_name: cvgenix-mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: cvgenix
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - cvgenix-net
+
+  # ── Backend: Node.js + Express ────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cvgenix-backend
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGODB_URI: mongodb://admin:${MONGO_ROOT_PASSWORD}@mongodb:27017/cvgenix?authSource=admin
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mongodb
+    networks:
+      - cvgenix-net
+
+  # ── Frontend: React + Nginx ───────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cvgenix-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - cvgenix-net
+
+# ── Shared network ────────────────────────────────────
+networks:
+  cvgenix-net:
+    driver: bridge
+
+# ── Persistent volume for MongoDB data ───────────────
+volumes:
+  mongo-data:
