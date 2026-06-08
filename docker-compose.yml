@@ -42,6 +42,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=http://10.59.107.87:5000/api
     container_name: cvgenix-frontend
     restart: always
     ports:
