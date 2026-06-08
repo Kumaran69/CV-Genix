@@ -8,8 +8,8 @@ services:
     container_name: cvgenix-mongo
     restart: always
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_ROOT_USERNAME: kumarkumaran6253
+      MONGO_INITDB_ROOT_PASSWORD: KumaranDB6253
       MONGO_INITDB_DATABASE: cvgenix
     ports:
       - "27017:27017"
@@ -28,8 +28,8 @@ services:
     environment:
       NODE_ENV: production
       PORT: 5000
-      MONGODB_URI: mongodb://admin:${MONGO_ROOT_PASSWORD}@mongodb:27017/cvgenix?authSource=admin
-      JWT_SECRET: ${JWT_SECRET}
+      MONGODB_URI: mongodb://kumarkumaran6253:KumaranDB6253@cvgenix-mongo:27017/cvgenix?authSource=admin
+      JWT_SECRET: cvgenix_jwt_super_secret_key_2026
     ports:
       - "5000:5000"
     depends_on:
