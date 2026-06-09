@@ -1,7 +1,7 @@
 // frontend/src/services/jobService.js
 // ✅ Using your backend API routes
 
-const API_BASE = "http://localhost:5000";
+const API_BASE = "";
 
 // ── Get Job Recommendations from your backend ──────────────────────────
 export async function getJobRecommendations(token, skills = []) {
