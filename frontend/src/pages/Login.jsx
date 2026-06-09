@@ -37,7 +37,7 @@ export default function Login() {
   const googleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       try {
-        const res = await axios.post("http://localhost:5000/api/auth/google", {
+        const res = await axios.post("http://34.227.92.150.nip.io/api/auth/google", {
           access_token: tokenResponse.access_token,
         });
         loginUser(res.data.token, res.data.user);
